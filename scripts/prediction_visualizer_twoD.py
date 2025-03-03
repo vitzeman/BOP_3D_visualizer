@@ -7,6 +7,7 @@ import copy
 import os
 import logging
 import time
+import argparse
 
 import cv2
 import numpy as np
@@ -191,7 +192,24 @@ def demo_from_computer():
     cv2.waitKey(0)
 
 
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the prediction visualizer scripts.")
+    parser.add_argument(
+        "--config",
+        "-c",
+        type=str,
+        required=True,
+        help="Path to the configuration file.",
+    )
+    return parser.parse_args()
+
 if __name__ == "__main__":
+    args = parse_arguments()
+    config_path = Path(args.config)
+    with open(config_path, "r") as f:
+        config = json.load(f)
+
+    # TODO: clear this up and make it load from the config file
     # demo_from_computer()
     host = LOCAL_HOST_IP
     port = 65432  # Determine somehow

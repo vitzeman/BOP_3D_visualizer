@@ -39,16 +39,15 @@ The application expects the format same as the [BOP challenge for 6D pose estima
 - `csv_paths` - List of the paths to the csv files with the predictions for possible comparison of multiple methods.
 - `saving_path` - Path to the folder where the images with the 2D projections will be saved.
 
-5. Run the application with provided config file:
+5. Run the application:
 ```bash
-    python prediction_visualizer.py --config_path config/example_config.json
+    python main.py
 ```
-For now it is also required to run the python script for the 2D visualization in another terminal.
-```bash
-    python 2prediction_visualizer_twoD.py --config_path config/example_config.json
-```
+Will call 2 subprocesses for the GUI/3D visualization and the 2D visualization service.
 
-
+# TODO: Features to add
+- [ ] Add the switching between rgb and gray. This is required due to some of the datasets being in grayscale.
+- [ ] Add config loading in the main.py and its usege in the application.
 
 
 

@@ -904,7 +904,7 @@ class AppWindow:
 
         if self.settings.apply_material:
             self._scene.scene.modify_geometry_material(
-                "annotation_scene", self.settings.scene_material
+                "point_cloud", self.settings.scene_material
             )
             self.settings.apply_material = False
 
@@ -1401,7 +1401,25 @@ def run_app(connection: socket.socket = None):
     gui.Application.instance.run()
 
 
-def main():
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the prediction visualizer scripts.")
+    parser.add_argument(
+        "--config",
+        "-c",
+        type=str,
+        required=True,
+        help="Path to the configuration file.",
+    )
+    return parser.parse_args()
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    config_path = Path(args.config)
+
+    print(f"Loading configuration from {config_path}")
+    print(config_path.exists())
+    with open(config_path, "r") as f:
+        config = json.load(f)
 
     host = LOCAL_HOST_IP
     port = 65432  # TODO: Add some automatic detection of the port
@@ -1416,8 +1434,3 @@ def main():
         conn, addr = s.accept()
         LOGGER.info(f"Connected by {addr}")
         run_app(conn)
-
-
-if __name__ == "__main__":
-    # run_app()
-    main()

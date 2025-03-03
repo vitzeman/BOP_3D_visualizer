@@ -1,6 +1,6 @@
 {
-    "_comment_split_scene_path": "Path to the directory with the split scenes",
-    "split_scene_path": "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/test",
+    "_comment_split_scenes_path": "Path to the directory with the split scenes",
+    "split_scenes_path": "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/test",
     "_comment_models_path": "Path to the directory with the 3D models",
     "models_path": "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/models",
     "_comment_csv_paths": "List of paths to the CSV files with the results of the methods",
