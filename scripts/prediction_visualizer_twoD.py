@@ -148,7 +148,7 @@ class PredictionVisualizerTwoD:
             Kmx = np.array(data["Kmx"])
             objects_poses = data["objects_poses"]
             color = data["color"]
-            color = [255 * x for x in color]
+            color = [255 * x for x in color][::-1]
 
             img = cv2.imread(img_path)
             # cv2.imshow("Input", img)
@@ -158,8 +158,8 @@ class PredictionVisualizerTwoD:
             # cv2.imshow("Contour", contour_img)
 
             # cv2.waitKey(0)
-            overlay = cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)
-            contour_img = cv2.cvtColor(contour_img, cv2.COLOR_BGR2RGB)
+            # overlay = cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)
+            # contour_img = cv2.cvtColor(contour_img, cv2.COLOR_BGR2RGB)
             images = {"overlay": overlay.tolist(), "contour": contour_img.tolist()}
             back = json.dumps(images).encode() + b"\n"
             LOGGER.debug(f"Sending back the overlay and contour images.")
@@ -218,15 +218,26 @@ if __name__ == "__main__":
     split_scene_path = "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/test"
     models_path = "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/models"
 
+
+    host = config.get("host", host)
+    port = config.get("port", port)
+    
+    split_scene_path = config.get("split_scenes_path", None)
+    models_path = config.get("models_path", None)
+
+    assert split_scene_path is not None, "Split scene path is not provided."
+    assert models_path is not None, "Models path is not provided."
+
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     LOGGER.info(f"Trying to connect on {host}:{port}")
     while True:
         try:
             s.connect((host, port))
             break
-        except:
+        except Exception as e:
             LOGGER.warning(f"Connection on {host}:{port} failed. Retrying...")
             time.sleep(1)
+    
 
     LOGGER.info(f"Connection established on {host}:{port}")
 

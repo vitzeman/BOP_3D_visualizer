@@ -64,6 +64,10 @@ COLORS_RGB_U8 = [
     # (0, 0, 0), # BLACK # Excluding due the basic
 ]
 
+COLORS_RGB_U8 = [
+    (255, 0, 255)
+]
+
 COLORS_RGB_F = [(x[0] / 255, x[1] / 255, x[2] / 255) for x in COLORS_RGB_U8]
 LOCAL_HOST_IP = "127.0.0.1"
 
@@ -128,11 +132,16 @@ class Models:
             models_paths, desc="Loading models", leave=False, ncols=100
         ):
             model_name = os.path.basename(model_path).split(".")[0]
-            model_name = str(int(model_name))
+            if model_name.isdigit():
+                model_name = str(int(model_name))
+            else:
+                model_name = model_name.split("_")[1]
+                model_name = str(int(model_name))
 
             # TODO: maybe add scaling of the model to the meter scale here so it is done once IDK
             # self.models[model_name] = model_path
             model = o3d.io.read_triangle_mesh(model_path)
+            model.compute_vertex_normals()
             # model.compute_vertex_normals()
             self.models[model_name] = model
 
@@ -576,7 +585,7 @@ class Settings:
         self.scene_material.shader = Settings.LIT
 
         self.annotation_obj_material = rendering.MaterialRecord()
-        self.annotation_obj_material.base_color = [0.9, 0.3, 0.3, 1.0]
+        self.annotation_obj_material.base_color = [1.0, 1.0, 1.0, 1.0]
         self.annotation_obj_material.shader = Settings.LIT
 
 
@@ -1176,7 +1185,7 @@ class AppWindow:
         mtl = o3d.visualization.rendering.MaterialRecord()
         mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
         mtl.shader = "defaultLit"
-
+        self._current_gt_count = {}
         for annotation in tqdm(
             gt, desc="Adding GT to the scene", leave=False, ncols=100
         ):
@@ -1198,7 +1207,10 @@ class AppWindow:
             model.transform(Tmx)
             model.paint_uniform_color(self._GT_color)
 
-            model_name = f"GT_{obj_id}"
+            # TODO: FIGURE OUT A WAY HOW TO ADD MULTIPLE MODELS OF THE SAME TYPE TO THE SCENE AND REMEMBER THEM
+            num = self._current_gt_count.get(obj_id, 0)
+            self._current_gt_count[obj_id] = num + 1
+            model_name = f"GT_{obj_id}-{num}"
             # THIS WORKS GOOD FOR TODAY
             # self._scene.scene.add_model(model_name, model)
             self._scene.scene.add_geometry(model_name, model, mtl)
@@ -1373,20 +1385,26 @@ class AppWindow:
         self._add_predictions_to_scene(bop_scene_id, bop_img_id)
 
 
-def run_app(connection: socket.socket = None):
+def run_app(config: dict, connection: socket.socket):
     """Runs the application with the given connection for 2D visualization
 
     Args:
-        connection (socket.socket, optional): _description_. Defaults to None.
+        config (dict): Configuration dictionary
+        connection (socket.socket, optional):   Connection to the 2D renderer. Defaults to None.
     """
 
     # TODO: Move this to some configuration file
+    # REMOVE THIS
     split_scene_path = "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/test"
     models_path = "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/models"
     csv_paths = [
         "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/results/MegaPoseMeshes_ClearPose-test.csv",
         "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/results/nerfCoarse_ClearPose-test.csv",
     ]
+
+    split_scene_path = config.get("split_scenes_path", None)
+    models_path = config.get("models_path", None)
+    csv_paths = config.get("csv_paths", None)
 
     scenes = Dataset(
         scenes_path=split_scene_path, models_path=models_path, csv_paths=csv_paths
@@ -1416,13 +1434,17 @@ if __name__ == "__main__":
     args = parse_arguments()
     config_path = Path(args.config)
 
-    print(f"Loading configuration from {config_path}")
-    print(config_path.exists())
     with open(config_path, "r") as f:
         config = json.load(f)
 
+    
+
     host = LOCAL_HOST_IP
-    port = 65432  # TODO: Add some automatic detection of the port
+    port = 65432
+
+    host = config.get("host", host)
+    port = config.get("port", port)
+
 
     with socket.socket() as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -1433,4 +1455,4 @@ if __name__ == "__main__":
         )
         conn, addr = s.accept()
         LOGGER.info(f"Connected by {addr}")
-        run_app(conn)
+        run_app(config, conn)
