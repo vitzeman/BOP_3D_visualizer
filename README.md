@@ -15,6 +15,8 @@ Features:
 ![2D_visualization_example_contour](images/MegaPoseMeshes_1001_1300_contour.png)
 ![2D_visualization_example_ocerlay](images/MegaPoseMeshes_1001_1300_overlay.png)
 
+Be mindfull that the application is still in development and some features might not work as expected.
+Also the application shows the whole split, so if showcasing the result for example LM-O datset, it does not consirder the `test_targets_bop19.json` file, which is used for the evaluation of the results in BOP challenge, wher only certain images are used (3, 7, ...).
 ## Data format
 The application expects the format same as the [BOP challenge for 6D pose estimation](https://bop.felk.cvut.cz/challenges/bop-challenge-2019/), that is a csv file named `METHOD_DATASET-test.csv` with the following columns:
 - scene_id -> The scene id of the dataset.
