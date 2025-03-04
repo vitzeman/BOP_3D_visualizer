@@ -633,8 +633,17 @@ class AppWindow:
         self.cur_scene_id = 0
         self.cur_scene_name = self.scenes_names_l[self.cur_scene_id]
 
+        self._image_modality = "rgb"
+        path2images = self.scenes_path / self.cur_scene_name / self._image_modality
+        if not path2images.exists():
+            LOGGER.warning(f"No images found in {path2images} - trying to find the gray images")
+            self._image_modality = "gray"
+            path2images = self.scenes_path / self.cur_scene_name / self._image_modality
+            if not path2images.exists():
+                raise ValueError(f"No images found in {path2images}")
+
         self.cur_scene_img_names_l = sorted(
-            os.listdir(self.scenes_path / self.cur_scene_name / "rgb")
+            os.listdir(path2images)
         )
         self.cur_image_id = 0
 
@@ -1303,7 +1312,7 @@ class AppWindow:
             depth_scale = camera_params[key]["depth_scale"]
             self.Kmx = cam_K
 
-        rgbs_path = scene_path / "rgb"
+        rgbs_path = scene_path / self._image_modality
         rgbs_names = sorted(os.listdir(rgbs_path))
 
         if len(rgbs_names) == 0:
