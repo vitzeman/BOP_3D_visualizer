@@ -1,4 +1,6 @@
 {
+    "_comment_dataset_name": "Name of the dataset",
+    "dataset_name": "clearpose_downsample_100_bop",
     "_comment_split_scenes_path": "Path to the directory with the split scenes",
     "split_scenes_path": "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/test",
     "_comment_models_path": "Path to the directory with the 3D models",
@@ -7,5 +9,7 @@
     "csv_paths": [
         "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/results/MegaPoseMeshes_ClearPose-test.csv",
         "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/results/nerfCoarse_ClearPose-test.csv"
-    ]
+    ],
+    "_comment_save_image_path": "Path to the directory where the images with the results will be saved",
+    "save_image_path": "images"
 }

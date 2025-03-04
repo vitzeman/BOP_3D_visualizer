@@ -173,3 +173,4 @@ cython_debug/
 # Ignore everything in the config directory except example_config.json
 config/*
 !config/example_config.json
+images_iccv25/*

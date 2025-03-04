@@ -40,6 +40,7 @@ from tqdm import tqdm
 
 # Define these colors form https://sashamaps.net/docs/resources/20-colors/
 COLORS_RGB_U8 = [
+    (255, 0, 255),
     # (230, 25, 75), # RED # Excluding due to to usage as the GT
     # (60, 180, 75), # GREEN # Excludint due to to usage as the GT
     (255, 225, 25),  # YELLOW
@@ -64,9 +65,6 @@ COLORS_RGB_U8 = [
     # (0, 0, 0), # BLACK # Excluding due the basic
 ]
 
-COLORS_RGB_U8 = [
-    (255, 0, 255)
-]
 
 COLORS_RGB_F = [(x[0] / 255, x[1] / 255, x[2] / 255) for x in COLORS_RGB_U8]
 LOCAL_HOST_IP = "127.0.0.1"
@@ -77,6 +75,7 @@ class Dataset:
 
     def __init__(
         self,
+        dataset_name: str,
         scenes_path: Union[str, Path],
         models_path: Union[str, Path],
         csv_paths: List[Union[str, Path]] = [],
@@ -92,6 +91,7 @@ class Dataset:
         ), f"Path {models_path} is not a valid directory"
         assert type(csv_paths) == list, "The csv_paths must be a list of paths"
 
+        self.dataset_name:str = dataset_name
         self.scenes_path = scenes_path
         self.models_path = models_path
         # self.csv_path = csv_path
@@ -195,6 +195,7 @@ class Prediction:
 
         file_name = csv_path.name
         self.method_name: str = file_name.split("_")[0]
+        self.dataset_name: str = file_name.split("_")[1].split("-")[0]
 
         self.color: Tuple[float] = color
 
@@ -227,7 +228,13 @@ class Prediction:
         self.window2D.add_child(self.window2D_widget)
         self.window2D.show(True)
 
+        self.window2D.set_on_close(self._igonore_close)
+
         self._is_window2D_initialized = True
+
+    def _igonore_close(self) -> None:
+        """Ignores the close event of the 2D visualization window"""
+        pass
 
     def _update_window2D(self, image: np.ndarray) -> None:
         """Updates the image in the 2D visualization window
@@ -293,10 +300,10 @@ class Prediction:
         dir_path.mkdir(parents=True, exist_ok=True)
 
         contour_name = (
-            dir_path / f"{self.method_name}_{self.scene_id}_{self.image_id}_contour.png"
+            dir_path / f"{self.dataset_name}_{self.method_name}_{str(self.scene_id).zfill(6)}_{str(self.image_id).zfill(6)}_contour.png"
         )
         overlay_name = (
-            dir_path / f"{self.method_name}_{self.scene_id}_{self.image_id}_overlay.png"
+            dir_path / f"{self.dataset_name}_{self.method_name}_{str(self.scene_id).zfill(6)}_{str(self.image_id).zfill(6)}_overlay.png"
         )
         cv2.imwrite(str(contour_name), self.contour)
         cv2.imwrite(str(overlay_name), self.overlay)
@@ -410,7 +417,7 @@ class Prediction:
                     LOGGER.error("No overlay and contour received")
         else:
             if self._is_window2D_initialized:
-                self._window2D.show(False)
+                self.window2D.show(False)
 
         return geom_list
 
@@ -603,7 +610,8 @@ class AppWindow:
         self,
         scene: Dataset,
         connection: socket.socket = None,
-        resolution: Tuple[int, int] = (1920, 1080),
+        resolution: Tuple[int, int] = (int(1080/3*4), 1080),
+        save_image_path: Union[str, Path] = Path("images"),
     ) -> None:
         if connection is not None:
             self.connection = connection
@@ -654,9 +662,11 @@ class AppWindow:
         self.settings = Settings()
 
         self.main_window = gui.Application.instance.create_window(
-            "Prediction Visualizer", *resolution
+            "Prediction Visualizer", *resolution,0,0
         )
+        print(type(self.main_window))
         mw = self.main_window
+        mw.set_on_close(self._on_close_mw)
 
         self._scene = gui.SceneWidget()
         self._scene.scene = rendering.Open3DScene(mw.renderer)
@@ -785,7 +795,8 @@ class AppWindow:
         self._show_ground_truth.checked = True  # TODO: Need to check if GT even exists
         self._show_ground_truth.set_on_checked(self._on_show_ground_truth)
 
-        self._GT_color = (60 / 255, 180 / 255, 75 / 255)  # GREEN default color
+        # self._GT_color = (60 / 255, 180 / 255, 75 / 255)  # GREEN default color
+        self._GT_color = (0.,1.,0.)
         self._GT_color_picker = gui.ColorEdit()
         self._GT_color_picker.color_value = gui.Color(*self._GT_color)
         self._GT_color_picker.set_on_value_changed(self._gt_color_changed)
@@ -812,7 +823,8 @@ class AppWindow:
         # <<< Prediction visualization cotrol<<<
 
         # >>> save images >>>
-        self.save_image_path = Path("images")
+        self.save_image_path = Path(save_image_path)
+        self.save_image_path.mkdir(parents=True, exist_ok=True)
         self.viewpoits_captured = 0
         self._save_images_button = gui.Button("Save images")
         self._save_images_button.horizontal_padding_em = 0.8
@@ -857,15 +869,41 @@ class AppWindow:
         self._left_shift_modifier = False
 
         # TODO: Implement behavior for the additional windows so they behave correctly
-        black_img = np.zeros((resolution[1], resolution[0], 3), dtype=np.uint8)
-        o3d_black_img = o3d.geometry.Image(black_img)
+        # black_img = np.zeros((resolution[1], resolution[0], 3), dtype=np.uint8)
+        # o3d_black_img = o3d.geometry.Image(black_img)
 
+        # self.rgb_window = gui.Application.instance.create_window(
+        #     "RGB Image", *resolution
+        # )
+        # self.rgb_window_widget = gui.ImageWidget(o3d_black_img)
+        # self.rgb_window.add_child(self.rgb_window_widget)
+        # self.rgb_window.show(self._show_2D.checked)
+        self._img_window_initialized = False
+
+
+    def _init_window2D(self, image: np.ndarray) -> None:
+        """ Initializes the 2D visualization window
+
+        Args:
+            image (np.ndarray): Image for the 2D visualization [HxWx3]
+        """
+        resolution = (image.shape[1], image.shape[0])
+        rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        img_o3d = o3d.geometry.Image(rgb)
         self.rgb_window = gui.Application.instance.create_window(
             "RGB Image", *resolution
         )
-        self.rgb_window_widget = gui.ImageWidget(o3d_black_img)
+        self.rgb_window_widget = gui.ImageWidget(img_o3d)
         self.rgb_window.add_child(self.rgb_window_widget)
         self.rgb_window.show(self._show_2D.checked)
+
+        self.rgb_window.set_on_close(self._igonore_close)
+        
+        self._img_window_initialized = True
+
+    def _igonore_close(self) -> None:
+        """Ignores the close event of the 2D visualization window"""
+        pass
 
     def _on_show_pointcloud(self, show):
         print("TODO Implement the point cloud visualization")
@@ -933,6 +971,12 @@ class AppWindow:
     def _on_menu_quit(self):
         """Quits the application"""
         # TODO: Implement the correct way to quit the application and close all the windows
+        gui.Application.instance.quit()
+
+    def _on_close_mw(self):
+        """Close the main window and all others
+        """      
+        # TODO implement better closing of the port  
         gui.Application.instance.quit()
 
     def _on_menu_about(self):
@@ -1151,17 +1195,32 @@ class AppWindow:
         pass
 
     def _on_save_images(self):
-        self.save_image_path.mkdir(exist_ok=True)
+        # self.save_image_path.mkdir(exist_ok=True)
         # TODO: FIGURE OUT HOW TO SAVE THE CURRENT VIEWPOINT in the main window
+        image_name = f"{self.scene.dataset_name}_3Dvis_scene{str(self._bop_scene_id).zfill(6)}_image{str(self._bop_img_id).zfill(6)}_view{str(self.viewpoits_captured).zfill(2)}"
         # scene_img_path = self.save_image_path / f"scene_{str(self.viewpoits_captured).zfill(2)}.png"
-        # img = gui.Application.render_to_image(self._scene.scene, 100, 100)
+        scene_img_path = self.save_image_path / f"{image_name}.png"
+        # print(self._scene.scene.get_image())
+        print(type(self._scene.scene))
+        print(type(self._scene.scene.scene))
+        def save_image_callback(image):
+            img = np.array(image)[:, :, ::-1]  # Converts to BGR
+            cv2.imwrite(str(scene_img_path), img)
+
+        self._scene.scene.scene.render_to_image(save_image_callback)
+        # o3d_img = gui.Application.render_to_image(self._scene.scene, 1920, 1080)
+        # o3d_img = o3d.geometry.Image()
+        # self._scene.scene.scene.render_to_image(o3d_image)
+        # img = np.array(o3d_img)[:, :, ::-1]  # Converts to BGR
+        # cv2.imwrite(str(scene_img_path), img)
 
         # o3d.io.write_image(scene_img_path, img)
         # print(f"Image saved to {scene_img_path}")
         self.viewpoits_captured += 1
         # TODO: add reseting of the viewpoits captured
-        for prediction in self.predictions:
-            prediction._save_images(self.save_image_path)
+        if self._show_2D.checked:
+            for prediction in self.predictions:
+                prediction._save_images(self.save_image_path)
 
     def _make_point_cloud(self, rgb_img, depth_img, cam_K):
         # convert images to open3d types
@@ -1289,8 +1348,10 @@ class AppWindow:
             scene_idx = 0
         elif scene_idx >= self.max_scene_num:
             scene_idx = self.max_scene_num - 1
+        else: 
+            self.viewpoits_captured = 0 # Reset the viewpoits count
         # <<< Limiting the scene index <<<
-
+        
         scene_path = self.scenes_path / self.scenes_names_l[scene_idx]
 
         image_name = int(self.cur_scene_img_names_l[image_idx].split(".")[0])
@@ -1323,9 +1384,12 @@ class AppWindow:
         rgb = cv2.imread(str(rgb_path))
         self.rgb = rgb
 
-        o3d_image = o3d.geometry.Image(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB))
-        self.rgb_window_widget.update_image(o3d_image)  # Update the image in the window
-        self.rgb_window.post_redraw()  # Forces to redraw the window
+        if not self._img_window_initialized:
+            self._init_window2D(rgb)
+        else:
+            o3d_image = o3d.geometry.Image(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB))
+            self.rgb_window_widget.update_image(o3d_image)  # Update the image in the window
+            self.rgb_window.post_redraw()  # Forces to redraw the window
 
         depth_path = scene_path / "depth" / rgbs_names[image_idx]
         depth_exists = depth_path.exists()
@@ -1391,6 +1455,8 @@ class AppWindow:
 
         bop_img_id = int(image_name)
         bop_scene_id = int(self.cur_scene_name)
+        self._bop_scene_id = bop_scene_id
+        self._bop_img_id = bop_img_id
         self._add_predictions_to_scene(bop_scene_id, bop_img_id)
 
 
@@ -1414,13 +1480,16 @@ def run_app(config: dict, connection: socket.socket):
     split_scene_path = config.get("split_scenes_path", None)
     models_path = config.get("models_path", None)
     csv_paths = config.get("csv_paths", None)
+    save_image_path = config.get("save_image_path", "images")
+    dataset_name = config.get("dataset", "BOP")
 
     scenes = Dataset(
+        dataset_name=dataset_name,
         scenes_path=split_scene_path, models_path=models_path, csv_paths=csv_paths
     )
 
     gui.Application.instance.initialize()
-    app = AppWindow(scenes, connection)  # Initializes the window
+    app = AppWindow(scenes, connection, save_image_path=save_image_path)  # Initializes the window
 
     app.scene_load(0, 0)
     # app.update_obj_list()
