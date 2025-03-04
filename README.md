@@ -48,10 +48,3 @@ Will call 2 subprocesses for the GUI/3D visualization and the 2D visualization s
 # TODO: Features to add
 - [ ] Add the switching between rgb and gray. This is required due to some of the datasets being in grayscale.
 - [ ] Add config loading in the main.py and its usege in the application.
-
-
-
-
-
-
-
