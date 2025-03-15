@@ -300,13 +300,15 @@ class Prediction:
         dir_path.mkdir(parents=True, exist_ok=True)
 
         contour_name = (
-            dir_path / f"{self.dataset_name}_{self.method_name}_{str(self.scene_id).zfill(6)}_{str(self.image_id).zfill(6)}_contour.png"
+            dir_path / f"{self.dataset_name}_{self.method_name}_s{str(self.scene_id).zfill(6)}_i{str(self.image_id).zfill(6)}_contour.png"
         )
         overlay_name = (
-            dir_path / f"{self.dataset_name}_{self.method_name}_{str(self.scene_id).zfill(6)}_{str(self.image_id).zfill(6)}_overlay.png"
+            dir_path / f"{self.dataset_name}_{self.method_name}_s{str(self.scene_id).zfill(6)}_i{str(self.image_id).zfill(6)}_overlay.png"
         )
-        cv2.imwrite(str(contour_name), self.contour)
-        cv2.imwrite(str(overlay_name), self.overlay)
+        if not contour_name.exists():
+            cv2.imwrite(str(contour_name), self.contour)
+        if not overlay_name.exists():    
+            cv2.imwrite(str(overlay_name), self.overlay)
 
     def get_predictions(
         self,
@@ -421,6 +423,7 @@ class Prediction:
 
         return geom_list
 
+    # TOOD: DELETE THIS
     def get_predictions_old(
         self,
         scene_id: int,
@@ -645,7 +648,8 @@ class AppWindow:
         path2images = self.scenes_path / self.cur_scene_name / self._image_modality
         if not path2images.exists():
             LOGGER.warning(f"No images found in {path2images} - trying to find the gray images")
-            self._image_modality = "gray"
+            # self._image_modality = "gray"
+            self._image_modality = "gray_xyz"
             path2images = self.scenes_path / self.cur_scene_name / self._image_modality
             if not path2images.exists():
                 raise ValueError(f"No images found in {path2images}")
@@ -955,6 +959,8 @@ class AppWindow:
             self.settings.bg_color.blue,
             self.settings.bg_color.alpha,
         ]
+        # print(bg_color)
+        # bg_color = [1,1,1,1]
         self._scene.scene.set_background(bg_color)
         self._scene.scene.show_axes(self.settings.show_axes)
 
@@ -1197,30 +1203,28 @@ class AppWindow:
     def _on_save_images(self):
         # self.save_image_path.mkdir(exist_ok=True)
         # TODO: FIGURE OUT HOW TO SAVE THE CURRENT VIEWPOINT in the main window
-        image_name = f"{self.scene.dataset_name}_3Dvis_scene{str(self._bop_scene_id).zfill(6)}_image{str(self._bop_img_id).zfill(6)}_view{str(self.viewpoits_captured).zfill(2)}"
-        # scene_img_path = self.save_image_path / f"scene_{str(self.viewpoits_captured).zfill(2)}.png"
+        LOGGER.info(f"Saving images for {self.scene.dataset_name} scene: {self._bop_scene_id} image: {self._bop_img_id}")
+        image_name = f"{self.scene.dataset_name}_3Dvis_s{str(self._bop_scene_id).zfill(6)}_i{str(self._bop_img_id).zfill(6)}_v{str(self.viewpoits_captured).zfill(2)}"
         scene_img_path = self.save_image_path / f"{image_name}.png"
-        # print(self._scene.scene.get_image())
-        print(type(self._scene.scene))
-        print(type(self._scene.scene.scene))
         def save_image_callback(image):
             img = np.array(image)[:, :, ::-1]  # Converts to BGR
+            white_mask = (img[:, :, 0] > 230) & (img[:, :, 1] > 230) & (img[:, :, 2] > 230)
+            img[white_mask] = 255
             cv2.imwrite(str(scene_img_path), img)
 
         self._scene.scene.scene.render_to_image(save_image_callback)
-        # o3d_img = gui.Application.render_to_image(self._scene.scene, 1920, 1080)
-        # o3d_img = o3d.geometry.Image()
-        # self._scene.scene.scene.render_to_image(o3d_image)
-        # img = np.array(o3d_img)[:, :, ::-1]  # Converts to BGR
-        # cv2.imwrite(str(scene_img_path), img)
-
-        # o3d.io.write_image(scene_img_path, img)
-        # print(f"Image saved to {scene_img_path}")
         self.viewpoits_captured += 1
+
         # TODO: add reseting of the viewpoits captured
         if self._show_2D.checked:
             for prediction in self.predictions:
                 prediction._save_images(self.save_image_path)
+
+        inference_image_name = f"{self.scene.dataset_name}_2Dimg_s{str(self._bop_scene_id).zfill(6)}_i{str(self._bop_img_id).zfill(6)}"
+        inference_img_path = self.save_image_path / f"{inference_image_name}.png"
+        if not inference_img_path.exists():
+            cv2.imwrite(str(inference_img_path), self.rgb)
+
 
     def _make_point_cloud(self, rgb_img, depth_img, cam_K):
         # convert images to open3d types
@@ -1359,6 +1363,7 @@ class AppWindow:
             f"Loading scene_idx {scene_idx} and image_idx {image_idx} ~ {image_name}"
         )
         camera_params_path = scene_path / "scene_camera.json"
+        # camera_params_path = scene_path / "scene_camera_xyz.json"
         if not camera_params_path.exists():
             LOGGER.error(
                 f"Camera parameters not found in {camera_params_path} - Skipping the scene"
@@ -1369,8 +1374,13 @@ class AppWindow:
             camera_params = json.load(f)
             key = str(int(image_name))
             LOGGER.debug(f"Loading camera parameters for image {key}")
-            cam_K = np.array(camera_params[key]["cam_K"]).reshape(3, 3)
-            depth_scale = camera_params[key]["depth_scale"]
+            cur_camera_params = camera_params.get(key, None)
+            if cur_camera_params is None:
+                cam_K = None    
+                depth_scale = None  
+            else:
+                cam_K = np.array(camera_params[key]["cam_K"]).reshape(3, 3)
+                depth_scale = camera_params[key].get("depth_scale", 1)
             self.Kmx = cam_K
 
         rgbs_path = scene_path / self._image_modality
@@ -1391,7 +1401,8 @@ class AppWindow:
             self.rgb_window_widget.update_image(o3d_image)  # Update the image in the window
             self.rgb_window.post_redraw()  # Forces to redraw the window
 
-        depth_path = scene_path / "depth" / rgbs_names[image_idx]
+        # depth_path = scene_path / "depth" / rgbs_names[image_idx]
+        depth_path = scene_path / "depth_xyz" / rgbs_names[image_idx]
         depth_exists = depth_path.exists()
         if depth_exists and self._show_pointcloud.checked:
             depth = cv2.imread(str(depth_path), cv2.IMREAD_ANYDEPTH)
@@ -1481,7 +1492,7 @@ def run_app(config: dict, connection: socket.socket):
     models_path = config.get("models_path", None)
     csv_paths = config.get("csv_paths", None)
     save_image_path = config.get("save_image_path", "images")
-    dataset_name = config.get("dataset", "BOP")
+    dataset_name = config.get("dataset_name", "BOP")
 
     scenes = Dataset(
         dataset_name=dataset_name,
