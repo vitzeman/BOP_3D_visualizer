@@ -1055,6 +1055,8 @@ class AppWindow:
         self._add_predictions_to_scene(bop_scene_id, bop_img_id)
         # <<< VISUALIZATION OF THE PREDICTIONS <<<
 
+        self._scene.scene.set_lighting(rendering.Open3DScene.LightingProfile.NO_SHADOWS, [0, 0, 1])
+
 def run_app(config: dict, connection: socket.socket):
     """Runs the application with the given connection for 2D visualization
 
