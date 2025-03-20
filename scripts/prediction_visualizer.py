@@ -206,6 +206,7 @@ class Prediction:
         self._material = o3d.visualization.rendering.MaterialRecord()
         self._material.base_color = [1.0, 1.0, 1.0, 1.0]
         self._material.shader = "defaultLit"
+        self.window2D = None
 
         self.overlay = None
         self.contour = None
@@ -226,7 +227,7 @@ class Prediction:
         )
         self.window2D_widget = gui.ImageWidget(img_o3d)
         self.window2D.add_child(self.window2D_widget)
-        self.window2D.show(True)
+        self.window2D.show(self._checkbox.checked)
 
         self.window2D.set_on_close(self._igonore_close)
 
@@ -242,7 +243,7 @@ class Prediction:
         Args:
             image (np.ndarray): Image for the 2D visualization [HxWx3]
         """
-        self.window2D.show(True)
+        # self.window2D.show(True)
         img_o3d = o3d.geometry.Image(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         self.window2D_widget.update_image(img_o3d)
         self.window2D.post_redraw()
@@ -285,6 +286,32 @@ class Prediction:
         ]
 
         return predictions
+
+
+    def draw_curr_window2D(self):
+        """Draws the current overlay and contour images in the 2D window, also should be fasetr for the change of color"""
+        assert self.mask is not None, "Mask must be provided for the 2D visualization"
+        assert self.contours is not None, "Contours must be provided for the 2D visualization"
+        
+        img = cv2.imread(str(self.image_path))
+        color = [255 * x for x in self.color][::-1]
+        masked_img = np.zeros_like(img)
+        # print(f"Contour: {self.overlay}")
+
+        masked_img[self.mask] = color
+        overlay_img = img.copy()
+        overlay = cv2.addWeighted(overlay_img, 1, masked_img, 1, 0)
+        
+        contour_img = img.copy()
+        cv2.drawContours(contour_img, self.contours, -1, color, 2)
+        # contours = (np.array(self.contour)).astype(np.int32)
+        # cv2.drawContours(contour_img, contours, -1, color, 2)
+        together = np.concatenate((overlay, contour_img), axis=0) 
+        if self._is_window2D_initialized:
+            self._update_window2D(together)
+        else:
+            self._init_window2D(together)
+
 
     def _save_images(self, direcory_path: Union[str, Path] = "") -> None:
         """Saves the contour and overlay images to the given directory
@@ -333,11 +360,12 @@ class Prediction:
         Returns:
             Union[List[o3d.geometry.TriangleMesh],Tuple[List[o3d.geometry.TriangleMesh], np.ndarray, np.ndarray]: List of the annotation objects in the scene or Tuple of the annotation objects, overlay and contour if plot2D is True
         """
+        self.image_path = image_path
         self.scene_id = scene_id
         self.image_id = image_id
         predictions = self._load_predictions(scene_id, image_id)
 
-        geom_list = []
+        geom_list = [] # List with open3d geometry objects used for the visualization
         objects_poses = []
         for e, row in predictions.iterrows():
             obj_id = str(row["obj_id"])
@@ -385,7 +413,7 @@ class Prediction:
                 }
                 data = json.dumps(d).encode() + b"\n"
 
-                LOGGER.debug(f"Sending the data to the slave")
+                LOGGER.debug("Sending the data to the slave")
                 self.conn.sendall(data)
                 # send the data to the slave
                 # wait for the response
@@ -400,185 +428,27 @@ class Prediction:
 
                 response = json.loads(response)
 
-                # Rewrite to dict.get
-                self.overlay = response.get("overlay", None)
-                self.contour = response.get("contour", None)
+                mask = response.get("mask", None)
+                contours = response.get("contours", None)
+                contours = [np.array(c) for c in contours]
 
-                if self.overlay is not None and self.contour is not None:
+                self.mask = mask
+                self.contours = contours
 
-                    self.overlay = np.array(self.overlay, dtype=np.uint8)
-                    self.contour = np.array(self.contour, dtype=np.uint8)
-
-                    together = np.concatenate((self.overlay, self.contour), axis=0)
-
-                    if self._is_window2D_initialized:
-                        self._update_window2D(together)
-                    else:
-                        self._init_window2D(together)
+                if self.mask is not None and self.contours is not None:
+                    self.draw_curr_window2D()
                 else:
                     LOGGER.error("No overlay and contour received")
+            else:
+                LOGGER.error("No connection to the 2D visualization server")
+                self.mask = None
+                self.contours = None
         else:
             if self._is_window2D_initialized:
                 self.window2D.show(False)
 
         return geom_list
-
-    # TOOD: DELETE THIS
-    def get_predictions_old(
-        self,
-        scene_id: int,
-        image_id: int,
-        plot2D: bool = False,
-        Kmx: np.ndarray = None,
-        image: np.ndarray = None,
-    ) -> Union[
-        List[o3d.geometry.TriangleMesh],
-        Tuple[List[o3d.geometry.TriangleMesh], np.ndarray, np.ndarray],
-    ]:
-        """Returns the predictions for the given scene and image
-
-        Args:
-            scene_id (int): Index of the scene
-            image_id (int): Index of the image
-            plot2D (bool): If True, the 2D visualization is returned with the overlay and contour
-            Kmx (np.ndarray): Camera matrix for the 2D visualization [3x3]
-            image (np.ndarray): Image for the 2D visualization [HxWx3]
-
-        Returns:
-            Union[List[o3d.geometry.TriangleMesh],Tuple[List[o3d.geometry.TriangleMesh], np.ndarray, np.ndarray]: List of the annotation objects in the scene or Tuple of the annotation objects, overlay and contour if plot2D is True
-        """
-        predictions = self._load_predictions(scene_id, image_id)
-
-        if plot2D:
-            assert Kmx is not None, "K matrix must be provided for 2D visualization"
-            assert Kmx.shape == (3, 3), f"K matrix must be 3x3 not {Kmx.shape}"
-            assert image is not None, "Image must be provided for 2D visualization"
-
-            # >>> Renderer for 2D visualization >>>
-            height, width = image.shape[:2]
-            pinhole = o3d.camera.PinholeCameraIntrinsic(
-                width, height, Kmx[0, 0], Kmx[1, 1], Kmx[0, 2], Kmx[1, 2]
-            )
-            offscreen_renderer = o3d.visualization.rendering.OffscreenRenderer(
-                width, height
-            )
-            offscreen_renderer.scene.set_background(
-                [0.0, 0.0, 0.0, 0.0]
-            )  # Black background
-            offscreen_renderer.scene.scene.set_sun_light(
-                [-1, -1, -1], [1.0, 1.0, 1.0], 100000
-            )
-
-            mtl = o3d.visualization.rendering.MaterialRecord()
-            mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
-            mtl.shader = "defaultUnlit"
-
-            # <<< Renderer for 2D visualization <<<
-
-            contour_image = image.copy()
-
-        geom_list = []
-        for e, row in predictions.iterrows():
-            obj_id = str(row["obj_id"])
-            Rmx = (
-                np.array([x for x in row["R"].split(" ") if x != ""])
-                .astype(np.float32)
-                .reshape(3, 3)
-            )
-            tv = (
-                np.array([x for x in row["t"].split(" ") if x != ""])
-                .astype(np.float32)
-                .reshape(3, 1)
-            ) / 1000  # Convert to meters
-            pred_model = self.models_set.get_model(obj_id)
-
-            Tmx = np.eye(4)
-            Tmx[:3, :3] = Rmx
-            Tmx[:3, 3] = tv.flatten()
-
-            # TODO: Check which ones are necesseary Probablz will work with model
-            # if type(model) == o3d.geometry.TriangleMesh:
-            #     model.transform(Tmx, center=(0, 0, 0))
-            #     model.paint_uniform_color(self.color)
-            #     geom_list.append(model)
-            #     mesh = model
-
-            # elif type(model) == o3d.geometry.TriangleModel:
-            #     model.material[0].shader = "defaultUnlit"
-            #     model.meshes[0].mesh.scale(1 / 1000, center=(0, 0, 0))
-            #     model.meshes[0].mesh.transform(Tmx, center=(0, 0, 0))
-            #     model.meshes[0].mesh.paint_uniform_color(self.color)
-            #     geom_list.append(model)
-            #     mesh = model.meshes[0].mesh
-
-            # pred_model.materials[0].shader = "defaultUnlit"
-            # pred_model.meshes[0].mesh.scale(1 / 1000, center=(0, 0, 0))
-            # pred_model.meshes[0].mesh.transform(Tmx)
-            # pred_model.meshes[0].mesh.paint_uniform_color(self.color)
-
-            pred_model.scale(1 / 1000, center=(0, 0, 0))
-            pred_model.transform(Tmx)
-            pred_model.paint_uniform_color(self.color)
-
-            geom_list.append(pred_model)
-
-            mesh = pred_model
-            if plot2D:
-                # Plot the contours over the image
-                mesh.paint_uniform_color([1, 1, 1])
-                name = f"{self.method_name}_{obj_id}"
-                offscreen_renderer.scene.add_geometry(name, mesh, mtl)
-                # TODO: Move this setup after inputing the mesh to draw everything in one go
-                offscreen_renderer.setup_camera(pinhole, np.eye(4))
-
-                img_o3d = offscreen_renderer.render_to_image()
-                img = np.array(img_o3d)[:, :, ::-1]  # Converts to BGR
-                img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                ret, thresh = cv2.threshold(img_gray, 50, 255, 0)
-                contours, _ = cv2.findContours(
-                    thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-                )
-
-                cv2.drawContours(
-                    contour_image,
-                    contours,
-                    -1,
-                    tuple(x * 255 for x in self.color),  # converts to uint8
-                    2,
-                )
-                offscreen_renderer.scene.remove_geometry(name)
-
-                mesh.paint_uniform_color(self.color)  # Restores the color JTBS
-
-        if plot2D:
-            # Prepare the rendering
-            for e, model in enumerate(geom_list):
-                # offscreen_renderer.scene.add_model(f"{self.method_name}_{e}", model)
-                offscreen_renderer.scene.add_geometry(
-                    f"{self.method_name}_{e}", model, mtl
-                )
-
-            img_o3d = offscreen_renderer.render_to_image()
-
-            # Clears the scene after rendering
-            for e, model in enumerate(geom_list):
-                offscreen_renderer.scene.remove_geometry(f"{self.method_name}_{e}")
-
-            img = np.array(img_o3d)[:, :, ::-1]  # Converts to BGR
-            overlay = cv2.addWeighted(image, 0.25, img, 1, 0)
-
-            img_concat = np.concatenate((overlay, contour_image), axis=1)
-            o3d_img = o3d.geometry.Image(cv2.cvtColor(img_concat, cv2.COLOR_BGR2RGB))
-            self.window2D.show(True)
-            self.window2D_widget.update_image(o3d_img)
-            self.window2D.post_redraw()
-
-        else:
-            self.window2D.show(False)
-
-        return geom_list
-
-
+    
 class Settings:
     UNLIT = "defaultUnlit"
     LIT = "defaultLit"
@@ -615,9 +485,28 @@ class AppWindow:
         connection: socket.socket = None,
         resolution: Tuple[int, int] = (int(1080/3*4), 1080),
         save_image_path: Union[str, Path] = Path("images"),
+        camera_name: str = None,
     ) -> None:
+        """Initializes the main application window and the settings
+
+        Args:
+            scene (Dataset): Dataset class with the dataset paths and the csv files
+            connection (socket.socket, optional): Connection to the 2D visualization server. Defaults to None.
+            resolution (Tuple[int, int], optional): Resolution of the main window. Defaults to (int(1080/3*4), 1080).
+            save_image_path (Union[str, Path], optional): Path to the directory where the images will be saved. Defaults to Path("images").
+            camera_name (str, optional): Camera name used in the bop dataset such as xyzibd, where there are multiple test image sets, named gray_xyz, rgb_realsense. Defaults to None.
+
+        Raises:
+            ValueError: _description_
+            ValueError: _description_
+        """        
         if connection is not None:
             self.connection = connection
+
+        self.camera_name = camera_name
+        self._depth_dir_name = "depth"
+        if camera_name:
+            self._depth_dir_name = f"{self._depth_dir_name}_{camera_name}" 
 
         self.scene: Dataset = scene
         self._reset_camera_view: bool = True
@@ -644,12 +533,14 @@ class AppWindow:
         self.cur_scene_id = 0
         self.cur_scene_name = self.scenes_names_l[self.cur_scene_id]
 
-        self._image_modality = "rgb"
+        self._image_modality = "rgb" # TODO: ADD CHECKING BASED ON THE CAMERA NAME
         path2images = self.scenes_path / self.cur_scene_name / self._image_modality
+        
+
+        # INFO: Check if the RGB images are present else try to find the gray images
         if not path2images.exists():
             LOGGER.warning(f"No images found in {path2images} - trying to find the gray images")
-            # self._image_modality = "gray"
-            self._image_modality = "gray_xyz"
+            self._image_modality = "gray" # TODO: ADD CHECKING BASED ON THE CAMERA NAME
             path2images = self.scenes_path / self.cur_scene_name / self._image_modality
             if not path2images.exists():
                 raise ValueError(f"No images found in {path2images}")
@@ -1135,14 +1026,36 @@ class AppWindow:
         self._reset_camera_view = True
         self.scene_load(self.cur_scene_id, self.cur_image_id)
 
-    def _on_reload_colors(self):
+    def _on_reload_colors(self): 
         """Reloads the visualization colors"""
         # FOR now just reloads the scene with the updated colors
-        # TODO: MAYBE ONLY CHANGE THE COLORS OF THE PREDICTIONS BY REMOVING THEM AND ADDING THEM AGAIN
-        self._update_scene()
+        # TODO: Do not force the redrawing of the scene
+        # self._update_scene()
+
+        mtl = o3d.visualization.rendering.MaterialRecord()
+        mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
+        mtl.shader = "defaultLit"
+
+        for prediction in self.predictions:
+            if prediction._checkbox.checked: # Draw only if the checkbox is checked
+                if self._show_2D.checked:
+                    prediction.draw_curr_window2D()
+
+                for pred_name, pred_model in zip(prediction._current_pred_names, prediction._current_pred_models):
+                    self._scene.scene.remove_geometry(pred_name)
+                    pred_model.paint_uniform_color(prediction.color)
+                    self._scene.scene.add_geometry(pred_name, pred_model, mtl)
+
+        if self._show_ground_truth.checked:
+            for gt_name, gt_model in zip(self._current_gt_names, self._current_gt_models):
+                self._scene.scene.remove_geometry(gt_name)
+                gt_model.paint_uniform_color(self._GT_color)
+                self._scene.scene.add_geometry(gt_name, gt_model, mtl)
 
     def _gt_color_changed(self, color: o3d.visualization.gui.Color):
-        """Updates the ground truth color based on the user input
+        """Updates the ground truth color based on the user input. 
+
+        To redraw the scene press the "Update colors" button in the visualization control
 
         Args:
             color (o3d.visualization.gui.Color): Color in the format (R,G,B)
@@ -1151,12 +1064,39 @@ class AppWindow:
         self._GT_color = rgb
 
     def _on_show_ground_truth(self, show):
-        print("TODO Implement update of 3D visualization of the ground truth")
-        self._update_scene()
+        if show:
+            mtl = o3d.visualization.rendering.MaterialRecord()
+            mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
+            mtl.shader = "defaultLit"
+            for gt_name, gt_model in zip(self._current_gt_names, self._current_gt_models):
+                self._scene.scene.remove_geometry(gt_name)
+                gt_model.paint_uniform_color(self._GT_color)
+                self._scene.scene.add_geometry(gt_name, gt_model, mtl)
+        else:
+            for gt_name in self._current_gt_names:
+                self._scene.scene.remove_geometry(gt_name)
+            
 
     def _on_show_predictions(self, show):
-        """Serves as a callback for the prediction checkboxes"""
-        self._update_scene()
+        """Serves as a callback for the prediction checkboxes, Removes and shows the predictions based on the checkbox state"""
+        print("update the scene")
+        mtl = o3d.visualization.rendering.MaterialRecord()
+        mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
+        mtl.shader = "defaultLit"
+        for prediction in self.predictions:
+            if prediction._checkbox.checked:
+                for pred_name, pred_model in zip(prediction._current_pred_names, prediction._current_pred_models):
+                    self._scene.scene.remove_geometry(pred_name)
+                    pred_model.paint_uniform_color(prediction.color)
+                    self._scene.scene.add_geometry(pred_name, pred_model, mtl)
+                if prediction.window2D is not None and self._show_2D.checked:
+                    prediction._show_window2D()
+                
+            else:
+                if prediction.window2D is not None:
+                    prediction._hide_window2D()
+                for pred_name in prediction._current_pred_names:
+                    self._scene.scene.remove_geometry(pred_name)
 
     def _update_scene(self):
         # TODO: Better way to update the scene than just redrawing everything
@@ -1258,6 +1198,8 @@ class AppWindow:
         mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
         mtl.shader = "defaultLit"
         self._current_gt_count = {}
+        self._current_gt_names = []
+        self._current_gt_models = []
         for annotation in tqdm(
             gt, desc="Adding GT to the scene", leave=False, ncols=100
         ):
@@ -1286,6 +1228,8 @@ class AppWindow:
             # THIS WORKS GOOD FOR TODAY
             # self._scene.scene.add_model(model_name, model)
             self._scene.scene.add_geometry(model_name, model, mtl)
+            self._current_gt_names.append(model_name)
+            self._current_gt_models.append(model)
 
     def _add_predictions_to_scene(self, scene_idx: int, image_idx: int) -> None:
         """Adds the predictions to the scene
@@ -1296,12 +1240,6 @@ class AppWindow:
         """
 
         for prediction in self.predictions:
-            if not prediction._checkbox.checked:
-                LOGGER.debug(
-                    f"Skipping {prediction.method_name} predictions as they are not checked"
-                )
-                continue
-
             if not self._show_2D.checked:
                 prediction_objs = prediction.get_predictions(scene_idx, image_idx)
 
@@ -1317,20 +1255,27 @@ class AppWindow:
             LOGGER.info(
                 f"Adding {prediction.method_name} predictions to the scene, {len(prediction_objs)} objects"
             )
+
+            prediction._current_pred_models = prediction_objs
+            prediction._current_pred_names = []
+
             for e, obj in enumerate(prediction_objs):
                 model_name = f"{prediction.method_name}_{e}"
+                prediction._current_pred_names.append(model_name)
                 LOGGER.debug(f"Adding {model_name} to the scene")
                 # self._scene.scene.add_model(model_name, obj)
                 # TODO: Figure out why sometimes the model is not able to be givent to the scene
                 try:
-                    self._scene.scene.add_geometry(
-                        model_name, obj, prediction._material
-                    )
+                    if prediction._checkbox.checked:
+                        self._scene.scene.add_geometry(
+                            model_name, obj, prediction._material
+                        )
+
                 except Exception as e:
-                    LOGGER.error(
+                    LOGGER.warning(
                         f"Error adding {model_name} to the scene - Skipping it"
                     )
-                    LOGGER.error(e)
+                    LOGGER.warning(e)
                     continue
 
     def scene_load(self, scene_idx: int, image_idx: int) -> None:
@@ -1362,7 +1307,12 @@ class AppWindow:
         LOGGER.info(
             f"Loading scene_idx {scene_idx} and image_idx {image_idx} ~ {image_name}"
         )
+
+        # >>> CAMERA PARAMETERS >>>
         camera_params_path = scene_path / "scene_camera.json"
+        if self.camera_name is not None:
+            # FOR XYZIBD da
+            camera_params_path = scene_path / f"scene_camera_{self.camera_name}.json"
         # camera_params_path = scene_path / "scene_camera_xyz.json"
         if not camera_params_path.exists():
             LOGGER.error(
@@ -1383,6 +1333,10 @@ class AppWindow:
                 depth_scale = camera_params[key].get("depth_scale", 1)
             self.Kmx = cam_K
 
+        # <<< CAMERA PARAMETERS <<<
+
+
+        # >>> RGB IMAGE >>>
         rgbs_path = scene_path / self._image_modality
         rgbs_names = sorted(os.listdir(rgbs_path))
 
@@ -1400,9 +1354,12 @@ class AppWindow:
             o3d_image = o3d.geometry.Image(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB))
             self.rgb_window_widget.update_image(o3d_image)  # Update the image in the window
             self.rgb_window.post_redraw()  # Forces to redraw the window
+        # <<< RGB IMAGE <<<
 
+        # >>> DEPTH IMAGE  + PCD >>>
+        # NOTE: Here needs to be called sothing liske extra params
         # depth_path = scene_path / "depth" / rgbs_names[image_idx]
-        depth_path = scene_path / "depth_xyz" / rgbs_names[image_idx]
+        depth_path = scene_path / self._depth_dir_name / rgbs_names[image_idx]
         depth_exists = depth_path.exists()
         if depth_exists and self._show_pointcloud.checked:
             depth = cv2.imread(str(depth_path), cv2.IMREAD_ANYDEPTH)
@@ -1439,9 +1396,10 @@ class AppWindow:
                 self._reset_camera_view = False
 
             # self._annotation_scene = AnnotationScene(geometry, scene_num, image_num)
-        # >>> VISUALIZATION OF THE GT >>>
-        # TODO: Check if GT EXISTS AS FOR SOME DATASETS IT IS NOT PROVIDED
+        
+        # <<< DEPTH IMAGE  + PCD <<<
 
+        # >>> VISUALIZATION OF THE GT >>>
         if self._show_ground_truth.checked:
             gt_path = scene_path / "scene_gt.json"
             self.gt_path = gt_path
@@ -1460,16 +1418,16 @@ class AppWindow:
                 self.gt_scene_annot = gt
                 self._add_gt3D_to_scene(gt)
         else:
-
             gt = []
         # <<< VISUALIZATION OF THE GT <<<
 
+        # >>> VISUALIZATION OF THE PREDICTIONS >>>
         bop_img_id = int(image_name)
         bop_scene_id = int(self.cur_scene_name)
         self._bop_scene_id = bop_scene_id
         self._bop_img_id = bop_img_id
         self._add_predictions_to_scene(bop_scene_id, bop_img_id)
-
+        # <<< VISUALIZATION OF THE PREDICTIONS <<<
 
 def run_app(config: dict, connection: socket.socket):
     """Runs the application with the given connection for 2D visualization

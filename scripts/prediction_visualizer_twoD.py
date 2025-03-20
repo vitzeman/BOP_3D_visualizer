@@ -47,6 +47,8 @@ class PredictionVisualizerTwoD:
         self.image_paths = Path(path2split)
         self.s = s
 
+        self.last_img_path:str = ""
+
     def render2D(
         self,
         img: np.ndarray,
@@ -74,7 +76,8 @@ class PredictionVisualizerTwoD:
         contour_img = copy.deepcopy(img)
         masked_img = np.zeros_like(img, dtype=np.uint8)
 
-        geom_list = []
+        all_contours = ()
+        bin_mask = np.zeros_like(img[:, :, 0], dtype=np.uint8)
         for e, object_pose in enumerate(objects_poses):
             # print(object_pose)
             obj_id = object_pose["obj_id"]
@@ -96,27 +99,16 @@ class PredictionVisualizerTwoD:
             contours, _ = cv2.findContours(
                 thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
             )
+            all_contours += contours
             cv2.drawContours(contour_img, contours, -1, color, 2)
             renderer.scene.remove_geometry(name)
-
             mask = (bgr > 50)[:, :, 0]
+            bin_mask = np.logical_or(bin_mask, mask)
             # Paint the colored mask into the masked image
             masked_img[mask] = color
 
-            # model.paint_uniform_color(color)
-            # geom_list.append(model)
-
-        # for model in geom_list:
-        #     renderer.scene.add_geometry(model)
-
-        # renderer.scene.set_camera(pinhole, np.eye(4))
-        # img_o3d = renderer.render_to_image()
-
-        # renderer.scene.clear_geometry() # IDK IF IT EXISTS
-
-        overlay = cv2.addWeighted(img, 1, masked_img, 1, 0)
-
-        return overlay, contour_img
+    
+        return bin_mask, all_contours
 
     def communication_loop(self, port: int):
         """Starts the communication loop for the prediction visualizer.
@@ -149,20 +141,25 @@ class PredictionVisualizerTwoD:
             objects_poses = data["objects_poses"]
             color = data["color"]
             color = [255 * x for x in color][::-1]
+            if self.last_img_path != img_path:
+                img = cv2.imread(img_path)
+                # TODO: only calculate the list of contours and binary masks to send back and color on other side 
+                self.overlay, contours = self.render2D(img, Kmx, objects_poses, color)
+                self.contours = tuple(c.tolist() for c in contours)
 
-            img = cv2.imread(img_path)
-            # cv2.imshow("Input", img)
+                    
+            else:
+                LOGGER.info("Image path is the same as the last one. Skipping the rendering.")
 
-            overlay, contour_img = self.render2D(img, Kmx, objects_poses, color)
-            # cv2.imshow("Overlay", overlay)
-            # cv2.imshow("Contour", contour_img)
+            self.last_img_path = img_path
+            overlay = self.overlay.tolist()
+            contour_img = self.contours
 
-            # cv2.waitKey(0)
-            # overlay = cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)
-            # contour_img = cv2.cvtColor(contour_img, cv2.COLOR_BGR2RGB)
-            images = {"overlay": overlay.tolist(), "contour": contour_img.tolist()}
+            # images = {"overlay": overlay.tolist(), "contour": contour_img.tolist()}
+            # back = json.dumps(images).encode() + b"\n"
+            images = {"mask": overlay, "contours": contour_img}
             back = json.dumps(images).encode() + b"\n"
-            LOGGER.debug(f"Sending back the overlay and contour images.")
+            LOGGER.debug("Sending back the overlay and contour images.")
             self.s.sendall(back)
 
 
