@@ -12,11 +12,16 @@ Features:
 - **Color selection** for the method predictions by the user. 
 - **Camera pose visualization** - basic camera frame visualization as OpenCV coordinate system.
 <!-- TODO: COMBINE IMAGES AND INPUT AS ONE -->
-![2D_visualization_example_contour](images/MegaPoseMeshes_1001_1300_contour.png)
-![2D_visualization_example_ocerlay](images/MegaPoseMeshes_1001_1300_overlay.png)
 
 Be mindfull that the application is still in development and some features might not work as expected.
-Also the application shows the whole split, so if showcasing the result for example LM-O datset, it does not consirder the `test_targets_bop19.json` file, which is used for the evaluation of the results in BOP challenge, wher only certain images are used (3, 7, ...).
+Also the application shows the whole split, so if showcasing the result for example LM-O datset, it does not consirder the `test_targets_bop19.json` or `test_targets_bop24.json` file, which is used for the evaluation of the results in BOP challenge, wher only certain images are used (3, 7, ...).
+## Exported visualization example
+| | |
+|:-------------------------:|:-------------------------:|
+|<img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_3Dvis_s001001_i000000_v00.png">  3D view image |  <img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_2Dimg_s001001_i000000.png"> Inference Image|
+|<img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_MegaPoseMeshes_s001001_i000000_contour.png"> First Method Contour Highlight |  <img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_MegaPoseMeshes_s001001_i000000_overlay.png">First Method Mask Overlay|
+|<img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_nerfCoarse_s001001_i000000_contour.png"> Second Method Contour Highlight  |  <img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_nerfCoarse_s001001_i000000_overlay.png"> Second Method Mask Overlay|
+
 
 ## Data format
 The application expects the format same as the [BOP challenge for 6D pose estimation](https://bop.felk.cvut.cz/challenges/bop-challenge-2019/), that is a csv file named `METHOD_DATASET-test.csv` with the following columns:
@@ -44,10 +49,12 @@ The application expects the format same as the [BOP challenge for 6D pose estima
 
 5. Run the application:
 ```bash
-    python main.py
+    python main.py -c config/example_config.json
 ```
-Will call 2 subprocesses for the GUI/3D visualization and the 2D visualization service.
+Will call 2 subprocesses for the GUI/3D visualization and the 2D visualization service. Replace the `config/example_config.json` with the path to your config file.
 
 # TODO: Features to add
-- [ ] Add the switching between rgb and gray. This is required due to some of the datasets being in grayscale.
-- [ ] Add config loading in the main.py and its usege in the application.
+- [X] Add the switching between rgb and gray. This is required due to some of the datasets being in grayscale.
+- [X] Add config loading in the main.py and its usege in the application.
+- [ ] Add the camera pose visualization.
+- [ ] Make more robust for xyzibd where multiple cameras are present in the scene.

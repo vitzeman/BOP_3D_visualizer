@@ -78,6 +78,9 @@ class Prediction:
         self.overlay = None
         self.contour = None
 
+        self.contour_img = None
+        self.overlay_img = None
+
     def _init_window2D(self, image: np.ndarray) -> None:
         """Initializes the 2D visualization window
 
@@ -176,6 +179,9 @@ class Prediction:
         else:
             self._init_window2D(together)
 
+        self.contour_img = contour_img
+        self.overlay_img = overlay
+
 
     def _save_images(self, direcory_path: Union[str, Path] = "") -> None:
         """Saves the contour and overlay images to the given directory
@@ -183,7 +189,7 @@ class Prediction:
         Args:
             direcory_path (Union[str, Path]): Path to the directory where the images will be saved
         """
-        if self.contour is None or self.overlay is None:
+        if self.contour_img is None or self.overlay_img is None:
             LOGGER.warning("No overlay and contour to save")
             return
 
@@ -197,9 +203,9 @@ class Prediction:
             dir_path / f"{self.dataset_name}_{self.method_name}_s{str(self.scene_id).zfill(6)}_i{str(self.image_id).zfill(6)}_overlay.png"
         )
         if not contour_name.exists():
-            cv2.imwrite(str(contour_name), self.contour)
+            cv2.imwrite(str(contour_name), self.contour_img)
         if not overlay_name.exists():    
-            cv2.imwrite(str(overlay_name), self.overlay)
+            cv2.imwrite(str(overlay_name), self.overlay_img)
 
     def get_predictions(
         self,

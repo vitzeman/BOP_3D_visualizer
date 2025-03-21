@@ -142,14 +142,15 @@ class PredictionVisualizerTwoD:
             objects_poses = data["objects_poses"]
             color = data["color"]
             color = [255 * x for x in color][::-1]
-            if self.last_img_path != img_path:
-                img = cv2.imread(img_path) 
-                self.overlay, contours = self.render2D(img, Kmx, objects_poses, color)
-                self.contours = tuple(c.tolist() for c in contours)
+            # if self.last_img_path != img_path: # THIS IS PROBLEMATIC DUE TO THE MULTIPLE PREDICTION METHODS USED on the same image
+            
+            img = cv2.imread(img_path) 
+            self.overlay, contours = self.render2D(img, Kmx, objects_poses, color)
+            self.contours = tuple(c.tolist() for c in contours)
 
                     
-            else:
-                LOGGER.info("Image path is the same as the last one. Skipping the rendering.")
+            # else:
+            #     LOGGER.info("Image path is the same as the last one. Skipping the rendering.")
 
             self.last_img_path = img_path
             overlay = self.overlay.tolist()
