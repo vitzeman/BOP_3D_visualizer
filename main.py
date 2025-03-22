@@ -1,3 +1,16 @@
+# Author: Vit Zeman
+# Czech Technical University in Prague, Czech Institute of Informatics, Robotics and Cybernetics, Testbed for Industry 4.0
+
+"""
+Main script to run this application, it uses suboprocesses and sockets to run
+both 3D window and 2D headless renderer
+
+Usage:
+    python main.py -c config/example_config.json
+
+Need to specify the `config/example_config.json` file and fill it with dataset paths.
+"""
+
 import os
 import json
 import logging
@@ -68,19 +81,19 @@ if __name__ == "__main__":
         python_executable = "python"  # fallback to system python
 
     if str(config_path).startswith("/"):
-        print("Absolute path")
         adjusted_config_path = config_path
     else:
-        print("Relative path")
-        print()
         adjusted_config_path = Path().resolve() / config_path
     
     adjusted_config_path = str(adjusted_config_path)
     with open(adjusted_config_path, "r") as f:
         config = json.load(f)
 
-    script1 = subprocess.Popen([python_executable, "scripts/prediction_visualizer.py", "-c", adjusted_config_path])
-    script2 = subprocess.Popen([python_executable, "scripts/prediction_visualizer_twoD.py", "-c", adjusted_config_path])
+    # script1 = subprocess.Popen([python_executable, "scripts/prediction_visualizer.py", "-c", adjusted_config_path])
+    # script2 = subprocess.Popen([python_executable, "scripts/prediction_visualizer_twoD.py", "-c", adjusted_config_path])
+
+    script1 = subprocess.Popen([python_executable, "src/predictionApp.py", "-c", adjusted_config_path])
+    script2 = subprocess.Popen([python_executable, "src/predictions_2D_renderer.py", "-c", adjusted_config_path])
 
     script1.wait()
     script2.wait()

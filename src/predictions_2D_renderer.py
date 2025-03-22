@@ -1,6 +1,10 @@
-"""Prediction visualiyer for rendering 2D representation of the prediction results."""
+# Author: Vit Zeman
+# Czech Technical University in Prague, Czech Institute of Informatics, Robotics and Cybernetics, Testbed for Industry 4.0
 
-from typing import List, Tuple, Union
+"""
+Contains the prediction visualizer file for the 2D projections of the predictions.
+"""
+from typing import  Tuple, Union
 from pathlib import Path
 import socket
 import copy
@@ -9,13 +13,14 @@ import logging
 import time
 import argparse
 
+# Third party imports
 import cv2
 import numpy as np
 import open3d as o3d
 import json
 
-
-from prediction_visualizer import Models
+# Custom imports
+from Models import Models
 
 
 os.makedirs("logs", exist_ok=True)
@@ -122,16 +127,12 @@ class PredictionVisualizerTwoD:
             while True:
                 b = self.s.recv(1024).decode()
                 bytes += b
-                # print(b)
                 last = b[-1]
-                # print(last)
                 if last == "\n":
                     break
 
             data = bytes
-            # LOGGER.debug(f"Received data: {type(data)}")
             data = json.loads(data)
-            # print(type(data))
             if "exit" in data.keys():
                 LOGGER.info("Exiting the 2D visualizer. ")
                 break
@@ -141,22 +142,20 @@ class PredictionVisualizerTwoD:
             objects_poses = data["objects_poses"]
             color = data["color"]
             color = [255 * x for x in color][::-1]
-            if self.last_img_path != img_path:
-                img = cv2.imread(img_path)
-                # TODO: only calculate the list of contours and binary masks to send back and color on other side 
-                self.overlay, contours = self.render2D(img, Kmx, objects_poses, color)
-                self.contours = tuple(c.tolist() for c in contours)
+            # if self.last_img_path != img_path: # THIS IS PROBLEMATIC DUE TO THE MULTIPLE PREDICTION METHODS USED on the same image
+            
+            img = cv2.imread(img_path) 
+            self.overlay, contours = self.render2D(img, Kmx, objects_poses, color)
+            self.contours = tuple(c.tolist() for c in contours)
 
                     
-            else:
-                LOGGER.info("Image path is the same as the last one. Skipping the rendering.")
+            # else:
+            #     LOGGER.info("Image path is the same as the last one. Skipping the rendering.")
 
             self.last_img_path = img_path
             overlay = self.overlay.tolist()
             contour_img = self.contours
 
-            # images = {"overlay": overlay.tolist(), "contour": contour_img.tolist()}
-            # back = json.dumps(images).encode() + b"\n"
             images = {"mask": overlay, "contours": contour_img}
             back = json.dumps(images).encode() + b"\n"
             LOGGER.debug("Sending back the overlay and contour images.")
@@ -206,15 +205,8 @@ if __name__ == "__main__":
     with open(config_path, "r") as f:
         config = json.load(f)
 
-    # TODO: clear this up and make it load from the config file
-    # demo_from_computer()
     host = LOCAL_HOST_IP
-    port = 65432  # Determine somehow
-
-    # TODO: THINK ABOUT HOW TO GET THIS AUTOMATICALLY
-    split_scene_path = "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/test"
-    models_path = "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/models"
-
+    port = 65432 
 
     host = config.get("host", host)
     port = config.get("port", port)
