@@ -10,16 +10,10 @@ Additionally allows to visualize the 2D images with the overlay of the predictio
 # Native imports
 import os
 import json
-import warnings
 import argparse
 import logging
-import sys
-import glob
-from dataclasses import dataclass
 from typing import List, Tuple, Union
 from pathlib import Path
-import copy
-import threading
 import socket
 
 
@@ -258,6 +252,11 @@ class AppWindow:
         self._show_axes = gui.Checkbox("Show camera axes")
         self._show_axes.set_on_checked(self._on_show_axes)
         view_ctrls.add_child(self._show_axes)
+
+        self._show_camera_pyramid = gui.Checkbox("Show camera")
+        self._show_camera_pyramid.set_on_checked(self._on_show_camera_pyramid)
+        self._show_camera_pyramid.checked = True
+        view_ctrls.add_child(self._show_camera_pyramid)
 
         self._show_2D = gui.Checkbox("Show 2D overlay")
         self._show_2D.set_on_checked(self._on_show_2D)
@@ -862,6 +861,7 @@ class AppWindow:
             self._current_gt_names.append(model_name)
             self._current_gt_models.append(model)
 
+
     def _add_predictions_to_scene(self, scene_idx: int, image_idx: int) -> None:
         """Adds the predictions to the scene
 
@@ -907,6 +907,59 @@ class AppWindow:
                     )
                     LOGGER.warning(e)
                     continue
+
+    def _on_show_camera_pyramid(self, show):
+        if show:
+            self.create_camera_pyramid(self.rgb, self.Kmx)
+        else:
+            self._scene.scene.remove_geometry("camera")
+            self._scene.scene.remove_geometry("camera_top")
+
+    def create_camera_pyramid(self, rgb:np.ndarray, cam_K:np.ndarray) -> None:
+        """Based on the camera intrinsics and rgb image creates the camera pyramid
+
+        Adds visualization of the camera pyramid to the scene with the notch
+        depicting the top of the image
+        
+        Args:
+            rgb (_type_): _description_
+            cam_K (_type_): _description_
+        """        
+        # TODO: add this shit to all the necessery stuff
+        mtl = o3d.visualization.rendering.MaterialRecord()
+        mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
+        mtl.shader = "defaultLit"
+        h, w = rgb.shape[:2]
+        camera_lineset = o3d.geometry.LineSet()
+        camera_lineset = camera_lineset.create_camera_visualization(w,h,cam_K, np.eye(4), scale=0.1)
+        camera_lineset.paint_uniform_color([.2, .2, .2])
+        camera_points = np.asarray(camera_lineset.points)
+        # print(camera_points)
+        # print(camera_points.shape)
+        self._scene.scene.add_geometry("camera", camera_lineset, mtl)
+
+        # create top view of the pyramid
+        left_top = camera_points[1,:]
+        right_top = camera_points[2,:]
+        right_bot = camera_points[3,:]
+        height = np.abs(right_bot[1] - right_top[1])
+        h = height * 0.33
+        
+        mid_width = (right_top[0] - left_top[0])/2
+        # print(mid_width)
+        # print(h)
+
+        notch_point = np.array([left_top[0] + mid_width, left_top[1] - h, left_top[2]])
+        # print(notch_point)
+        notch_points = np.array([left_top, right_top, notch_point])
+        top_lineset = o3d.geometry.LineSet()
+        top_lineset.points = o3d.utility.Vector3dVector(notch_points)
+        top_lineset.lines = o3d.utility.Vector2iVector([[0, 2], [2,1]])
+        top_lineset.paint_uniform_color([.2, .2, .2])
+        self._scene.scene.add_geometry("camera_top", top_lineset, mtl)
+
+        # TODO: Figure out if it is possible to add the current image inside the camera pyramid
+
 
     def scene_load(self, scene_idx: int, image_idx: int) -> None:
         """Function to load the certain scene and image from the dataset
@@ -985,6 +1038,9 @@ class AppWindow:
             self.rgb_window_widget.update_image(o3d_image)  # Update the image in the window
             self.rgb_window.post_redraw()  # Forces to redraw the window
         # <<< RGB IMAGE <<<
+
+        # self.create_camera_pyramid(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB), cam_K)
+        self._on_show_camera_pyramid(self._show_camera_pyramid.checked)
 
         # >>> DEPTH IMAGE  + PCD >>>
         depth_path = scene_path / self._depth_dir_name / rgbs_names[image_idx]

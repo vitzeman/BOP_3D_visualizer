@@ -14,7 +14,7 @@ Features:
 <!-- TODO: COMBINE IMAGES AND INPUT AS ONE -->
 
 Be mindfull that the application is still in development and some features might not work as expected.
-Also the application shows the whole split, so if showcasing the result for example LM-O datset, it does not consirder the `test_targets_bop19.json` or `test_targets_bop24.json` file, which is used for the evaluation of the results in BOP challenge, wher only certain images are used (3, 7, ...).
+Also the application shows the whole split, so if showcasing the result for example LM-O datset, the application does not consirder the `test_targets_bop19.json` or `test_targets_bop24.json` file, which is used for the evaluation of the results in BOP challenge, wher only certain images are used (3, 7, ...) and showcases results on all of the images.
 ## Exported visualization example
 | | |
 |:-------------------------:|:-------------------------:|

@@ -81,11 +81,8 @@ if __name__ == "__main__":
         python_executable = "python"  # fallback to system python
 
     if str(config_path).startswith("/"):
-        print("Absolute path")
         adjusted_config_path = config_path
     else:
-        print("Relative path")
-        print()
         adjusted_config_path = Path().resolve() / config_path
     
     adjusted_config_path = str(adjusted_config_path)
