@@ -56,5 +56,6 @@ Will call 2 subprocesses for the GUI/3D visualization and the 2D visualization s
 # TODO: Features to add
 - [X] Add the switching between rgb and gray. This is required due to some of the datasets being in grayscale.
 - [X] Add config loading in the main.py and its usege in the application.
-- [ ] Add the camera pose visualization.
+- [X] Add the camera pose visualization.
 - [ ] Make more robust for xyzibd where multiple cameras are present in the scene.
+- [ ] Finish the documentation and type hints.

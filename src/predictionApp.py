@@ -258,6 +258,11 @@ class AppWindow:
         self._show_camera_pyramid.checked = True
         view_ctrls.add_child(self._show_camera_pyramid)
 
+        self._show_camera_image = gui.Checkbox("Show camera image")
+        self._show_camera_image.set_on_checked(self._on_show_camera_image)
+        self._show_camera_image.checked = False
+        view_ctrls.add_child(self._show_camera_image)
+
         self._show_2D = gui.Checkbox("Show 2D overlay")
         self._show_2D.set_on_checked(self._on_show_2D)
         view_ctrls.add_child(self._show_2D)
@@ -440,7 +445,7 @@ class AppWindow:
 
     def _init_window2D(self, image: np.ndarray) -> None:
         """ Initializes the 2D visualization window
-
+    
         Args:
             image (np.ndarray): Image for the 2D visualization [HxWx3]
         """
@@ -452,11 +457,10 @@ class AppWindow:
         )
         self.rgb_window_widget = gui.ImageWidget(img_o3d)
         self.rgb_window.add_child(self.rgb_window_widget)
-        self.rgb_window.show(self._show_2D.checked)
-
         self.rgb_window.set_on_close(self._igonore_close)
         
         self._img_window_initialized = True
+        self.rgb_window.show(self._show_2D.checked)
 
     def _igonore_close(self) -> None:
         """Ignores the close event of the 2D visualization window"""
@@ -716,7 +720,6 @@ class AppWindow:
 
     def _on_show_predictions(self, show):
         """Serves as a callback for the prediction checkboxes, Removes and shows the predictions based on the checkbox state"""
-        print("update the scene")
         mtl = o3d.visualization.rendering.MaterialRecord()
         mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
         mtl.shader = "defaultLit"
@@ -909,11 +912,42 @@ class AppWindow:
                     continue
 
     def _on_show_camera_pyramid(self, show):
+        """ Callback for the camera pyramid checkbox
+
+        If the checkbox is checked the camera pyramid is shown in the scene
+        If it is unchecked the camera pyramid is removed from the scene as well as the image plane if it is shown
+
+        Args:
+            show (_type_): _description_
+        """        
         if show:
             self.create_camera_pyramid(self.rgb, self.Kmx)
         else:
             self._scene.scene.remove_geometry("camera")
             self._scene.scene.remove_geometry("camera_top")
+
+            if self._show_camera_image.checked:
+                self._scene.scene.remove_geometry("image_plane")
+                self._show_camera_image.checked = False
+
+    def _on_show_camera_image(self, show):
+        """Callback for the camera image checkbox
+
+        If the checkbox is checked the camera image is shown in the scene
+
+
+        Args:
+            show (_type_): _description_
+        """   
+
+        if show and self._show_camera_pyramid.checked:
+            self.create_image_plane(self.rgb, *self._cam_img_plane)
+        
+        else:
+            self._scene.scene.remove_geometry("image_plane")
+            self._show_camera_image.checked = False
+    
+
 
     def create_camera_pyramid(self, rgb:np.ndarray, cam_K:np.ndarray) -> None:
         """Based on the camera intrinsics and rgb image creates the camera pyramid
@@ -942,6 +976,9 @@ class AppWindow:
         left_top = camera_points[1,:]
         right_top = camera_points[2,:]
         right_bot = camera_points[3,:]
+        left_bot = camera_points[4,:]
+        cam_img_plane = [left_top, right_top, right_bot, left_bot]
+        self._cam_img_plane = cam_img_plane
         height = np.abs(right_bot[1] - right_top[1])
         h = height * 0.33
         
@@ -959,6 +996,43 @@ class AppWindow:
         self._scene.scene.add_geometry("camera_top", top_lineset, mtl)
 
         # TODO: Figure out if it is possible to add the current image inside the camera pyramid
+        
+
+    def create_image_plane(self, rgb:np.ndarray, left_top:np.ndarray, right_top:np.ndarray, right_bot:np.ndarray, left_bot:np.ndarray):
+        
+        img = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
+        # img = cv2.rotate(img, cv2.ROTATE_180)
+        img = cv2.flip(img, 0)
+        map_image = o3d.geometry.Image(img)
+
+        o3d.io.write_image("map_image.png", map_image)
+        # map_resy =  rgb.shape[0]
+        # map_resx =  rgb.shape[1]
+        # dtype_f = o3d.core.float32
+        # dtype_i = o3d.core.int64
+        
+        # Create a rectangle mesh with the image as texture
+        vertices = np.array([left_top, right_top, right_bot, left_bot], dtype=np.float32)
+        triangles = np.array([[0, 1, 2], [0, 2, 3]], dtype=np.int32)
+        uvs = np.array([[0, 0], [1, 0], [1, 1], [0,0], [1,1], [0,1]], dtype=np.float32)
+
+
+        # Create a material for the textured mesh
+        material = o3d.visualization.rendering.MaterialRecord()
+        # material.shader = "defaultLit"
+        material.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
+        material.base_metallic = 0.0
+        material.base_roughness = 1.0
+        material.albedo_img = map_image
+        # Map the image to the camera pyramid
+        texture_map = o3d.geometry.TriangleMesh()
+        texture_map.vertices = o3d.utility.Vector3dVector(vertices)
+        texture_map.triangles = o3d.utility.Vector3iVector(triangles)
+        texture_map.triangle_uvs = o3d.utility.Vector2dVector(uvs)
+        texture_map.textures = [map_image]
+        # texture_map.compute_vertex_normals()
+
+        self._scene.scene.add_geometry("image_plane", texture_map, material)
 
 
     def scene_load(self, scene_idx: int, image_idx: int) -> None:
