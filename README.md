@@ -18,7 +18,7 @@ Also the application shows the whole split, so if showcasing the result for exam
 ## Exported visualization example
 | | |
 |:-------------------------:|:-------------------------:|
-|<img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_3Dvis_s001001_i000000_v00.png">  3D view image |  <img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_2Dimg_s001001_i000000.png"> Inference Image|
+| <img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_2Dimg_s001001_i000000.png"> Inference Image |<img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_3Dvis_s001001_i000000_v00.png">  3D view |
 |<img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_MegaPoseMeshes_s001001_i000000_contour.png"> First Method Contour Highlight |  <img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_MegaPoseMeshes_s001001_i000000_overlay.png">First Method Mask Overlay|
 |<img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_nerfCoarse_s001001_i000000_contour.png"> Second Method Contour Highlight  |  <img width="1604" alt="screen shot 2017-08-07 at 12 18 15 pm" src="images/ClearPose_nerfCoarse_s001001_i000000_overlay.png"> Second Method Mask Overlay|
 
@@ -41,21 +41,23 @@ The application expects the format same as the [BOP challenge for 6D pose estima
     TODO: Open3d pandas numpy opencv-python and some others
 ```
 
-4. Setup the config path as seen in the [config.py](config/example_config.json) file.
-- `split_scene_path` - Path to the dataset folder and its split.
-- `models_path` - Path to the 3D models of the objects whic are used for the visualization.
-- `csv_paths` - List of the paths to the csv files with the predictions for possible comparison of multiple methods.
-- `saving_path` - Path to the folder where the images with the 2D projections will be saved.
+4. Setup the config path as seen in the [example_config.json](config/example_config.json) file.
+- `split_scene_path` -> Path to the dataset folder and its split.
+- `models_path` -> Path to the 3D models of the objects whic are used for the visualization.
+- `csv_paths` -> List of the paths to the csv files with the predictions for possible comparison of multiple methods.
+- `saving_path` -> Path to the folder where the images with the 2D projections will be saved.
 
 5. Run the application:
 ```bash
     python main.py -c config/example_config.json
 ```
-Will call 2 subprocesses for the GUI/3D visualization and the 2D visualization service. Replace the `config/example_config.json` with the path to your config file.
+Will call 2 subprocesses for the GUI/3D visualization and the 2D visualization service. 
+
+6. Use the GUI to navigate through the images and customize the visualization. Use left and righ mouse button to rotate and translate the camera in the 3D view. Use the scroll wheel to zoom in and out.
 
 # TODO: Features to add
 - [X] Add the switching between rgb and gray. This is required due to some of the datasets being in grayscale.
 - [X] Add config loading in the main.py and its usege in the application.
 - [X] Add the camera pose visualization.
 - [ ] Make more robust for xyzibd where multiple cameras are present in the scene.
-- [ ] Finish the documentation and type hints.
+- [X] Finish the documentation and type hints.

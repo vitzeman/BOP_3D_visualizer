@@ -25,16 +25,17 @@ from Models import Models
 
 os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | l: %(lineno)s | %(message)s",
-    handlers=[logging.FileHandler("logs/log.log", mode="w"), logging.StreamHandler()],
+    handlers=[logging.FileHandler("logs/log.log", mode="a"), logging.StreamHandler()],
 )
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("2DPrediction")
 
 LOCAL_HOST_IP = "127.0.0.1"
 
 
 class PredictionVisualizerTwoD:
+    """Class which renders the 2D predictions and sends them back to the client."""
 
     def __init__(
         self,
@@ -160,32 +161,6 @@ class PredictionVisualizerTwoD:
             back = json.dumps(images).encode() + b"\n"
             LOGGER.debug("Sending back the overlay and contour images.")
             self.s.sendall(back)
-
-
-def demo_from_computer():
-    split_scene_path = "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/test"
-    models_path = "/home/vit/CIIRC/bop_toolkit/clearpose_downsample_100_bop/models"
-
-    pv = PredictionVisualizerTwoD(models_path, split_scene_path)
-    print("Visualizer initialized.")
-    data_path = "/home/vit/CIIRC/bop_toolkit/data.json"
-    data = json.load(open(data_path, "r"))
-
-    img_path = data["img_path"]
-    Kmx = np.array(data["Kmx"])
-    objects_poses = data["object_poses"]
-    color = data["color"]
-    color = [255 * x for x in color]
-
-    img = cv2.imread(img_path)
-    cv2.imshow("Input", img)
-
-    overlay, contour_img = pv.render2D(img, Kmx, objects_poses, color)
-
-    cv2.imshow("Overlay", overlay)
-    cv2.imshow("Contour", contour_img)
-
-    cv2.waitKey(0)
 
 
 def parse_arguments() -> argparse.Namespace:

@@ -2,8 +2,8 @@
 # Czech Technical University in Prague, Czech Institute of Informatics, Robotics and Cybernetics, Testbed for Industry 4.0
 
 """
-Main script to run this application, it uses suboprocesses and sockets to run
-both 3D window and 2D headless renderer
+Main script to run this application, it uses suboprocesses to run
+both 3D window and 2D headless renderer and socket to handle the communication.
 
 Usage:
     python main.py -c config/example_config.json
@@ -20,13 +20,14 @@ import argparse
 
 os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | l: %(lineno)s | %(message)s",
-    handlers=[logging.FileHandler("logs/log.log", mode="w"), logging.StreamHandler()],
+    handlers=[logging.FileHandler("logs/log.log", mode="a"), logging.StreamHandler()],
 )
 LOGGER = logging.getLogger(__name__)
 
 def parse_arguments() -> argparse.Namespace:
+    """Parse the arguments from the command line."""
     parser = argparse.ArgumentParser(description="Run the prediction visualizer scripts.")
     parser.add_argument(
         "--config",
@@ -88,9 +89,6 @@ if __name__ == "__main__":
     adjusted_config_path = str(adjusted_config_path)
     with open(adjusted_config_path, "r") as f:
         config = json.load(f)
-
-    # script1 = subprocess.Popen([python_executable, "scripts/prediction_visualizer.py", "-c", adjusted_config_path])
-    # script2 = subprocess.Popen([python_executable, "scripts/prediction_visualizer_twoD.py", "-c", adjusted_config_path])
 
     script1 = subprocess.Popen([python_executable, "src/predictionApp.py", "-c", adjusted_config_path])
     script2 = subprocess.Popen([python_executable, "src/predictions_2D_renderer.py", "-c", adjusted_config_path])

@@ -26,11 +26,11 @@ from Models import Models
 
 os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(name)s | l: %(lineno)s | %(message)s",
-    handlers=[logging.FileHandler("logs/log.log", mode="w"), logging.StreamHandler()],
+    handlers=[logging.FileHandler("logs/log.log", mode="a"), logging.StreamHandler()],
 )
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("PredictionClass")
 
 class Prediction:
     """Handles the prediction files in csv format"""
