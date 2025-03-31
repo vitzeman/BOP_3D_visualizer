@@ -36,12 +36,12 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | l: %(lineno)s | %(message)s",
     handlers=[logging.FileHandler("logs/log.log", mode="w"), logging.StreamHandler()],
 )
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger("3DPrediction")
 
 
 # Define these colors form https://sashamaps.net/docs/resources/20-colors/
 COLORS_RGB_U8 = [
-    # (230, 25, 75), # RED # Excluding due to to usage as the GT
+    # (230, 25, 75), # RED 
     # (60, 180, 75), # GREEN # Excludint due to to usage as the GT
     (255, 225, 25),  # YELLOW
     (0, 130, 200),  # BLUE
@@ -94,7 +94,7 @@ class Dataset:
         assert os.path.isdir(
             models_path
         ), f"Path {models_path} is not a valid directory"
-        assert type(csv_paths) == list, "The csv_paths must be a list of paths"
+        assert isinstance(csv_paths, list), "The csv_paths must be a list of paths"
 
         self.dataset_name:str = dataset_name
         self.scenes_path = scenes_path
@@ -185,7 +185,6 @@ class AppWindow:
             prediction.set_color(COLORS_RGB_F[e] if e < len(COLORS_RGB_F) else random_color())
             predictions.append(prediction)
         self.predictions: list[Prediction] = predictions
-
         # <<< Load the predictions <<<
 
         # >>> Path preparation >>>
@@ -253,7 +252,7 @@ class AppWindow:
         self._show_axes.set_on_checked(self._on_show_axes)
         view_ctrls.add_child(self._show_axes)
 
-        self._show_camera_pyramid = gui.Checkbox("Show camera")
+        self._show_camera_pyramid = gui.Checkbox("Show camera pyramid")
         self._show_camera_pyramid.set_on_checked(self._on_show_camera_pyramid)
         self._show_camera_pyramid.checked = True
         view_ctrls.add_child(self._show_camera_pyramid)
@@ -267,8 +266,8 @@ class AppWindow:
         self._show_2D.set_on_checked(self._on_show_2D)
         view_ctrls.add_child(self._show_2D)
 
-        self._highlight_obj = gui.Checkbox("Highligh annotation objects")
-        self._highlight_obj.set_on_checked(self._on_highlight_obj)
+        # self._highlight_obj = gui.Checkbox("Highligh annotation objects")
+        # self._highlight_obj.set_on_checked(self._on_highlight_obj)
         # view_ctrls.add_child(self._highlight_obj) #
 
         self._point_size = gui.Slider(gui.Slider.INT)
@@ -330,7 +329,6 @@ class AppWindow:
         self._next_image_button = gui.Button(">")
         self._next_image_button.horizontal_padding_em = 0.4
         self._next_image_button.vertical_padding_em = 0
-        # self._next_image_button.background_color = gui.Color(0, 0.8, 0) # Will make the button green
         self._next_image_button.set_on_clicked(self._on_next_image)
 
         self._image_number = gui.Label("Image:")
@@ -516,8 +514,7 @@ class AppWindow:
             self.settings.bg_color.blue,
             self.settings.bg_color.alpha,
         ]
-        # print(bg_color)
-        # bg_color = [1,1,1,1]
+
         self._scene.scene.set_background(bg_color)
         self._scene.scene.show_axes(self.settings.show_axes)
 
@@ -528,7 +525,7 @@ class AppWindow:
             self.settings.apply_material = False
 
         self._show_axes.checked = self.settings.show_axes
-        self._highlight_obj.checked = self.settings.highlight_obj
+        # self._highlight_obj.checked = self.settings.highlight_obj
         self._point_size.double_value = self.settings.scene_material.point_size
 
     def _on_menu_quit(self):
@@ -570,13 +567,13 @@ class AppWindow:
         self.window.show_dialog(dlg)
 
     def _on_show_2D(self, show):
-        print("TODO Implement the 2D visualization")
+        """Callback for the 2D visualization checkbox, shows or hides the 2D visualization window"""
         self.rgb_window.show(show)
-
         self._update_scene()
 
-    # THESE NEED TO BE REWRITEN BASED on the indexes not just 1,2,3 etc
     def _on_next_scene(self):
+        """Callback for the next scene button, updates the scene based on the current scene index
+        """        
         candidate_scene_id = self.cur_scene_id + 1
         if candidate_scene_id >= self.max_scene_num:
             print("Already at the last scene")
@@ -598,6 +595,7 @@ class AppWindow:
         self._update_scene()
 
     def _on_previous_scene(self):
+        """Callback for the previous scene button, updates the scene based on the current scene index"""        
         candidate_scene_id = self.cur_scene_id - 1
         if candidate_scene_id < 0:
             print("Already at the first scene")
@@ -618,8 +616,13 @@ class AppWindow:
         self._update_scene_combox()
         self._update_scene()
 
-    def _on_scene_changed(self, name, index):
-        print(index, name)
+    def _on_scene_changed(self, name:str, index:int):
+        """Callback for the scene combobox, updates the scene based on the selected scene
+
+        Args:
+            name (str): Name of the selected scene
+            index (int): Index of the selected scene
+        """        
         self.cur_scene_id = index
         self.cur_scene_name = self.scenes_names_l[self.cur_scene_id]
 
@@ -638,6 +641,7 @@ class AppWindow:
         self.scene_load(self.cur_scene_id, self.cur_image_id)
 
     def _on_next_image(self):
+        """Callback for the next image button, updates the image based on the current image index"""        
         candidate_image_id = self.cur_image_id + 1
         if candidate_image_id >= len(self.cur_scene_img_names_l):
             print("Already at the last image")
@@ -652,6 +656,7 @@ class AppWindow:
         self._update_scene()
 
     def _on_previous_image(self):
+        """Callback for the previous image button, updates the image based on the current image index"""
         candidate_image_id = self.cur_image_id - 1
         if candidate_image_id < 0:
             print("Already at the first image")
@@ -665,7 +670,13 @@ class AppWindow:
         self._update_image_combox_selection()
         self._update_scene()
 
-    def _on_image_changed(self, name, index):
+    def _on_image_changed(self, name:str, index:int):
+        """Callback for the image combobox, updates the image based on the selected image
+
+        Args:
+            name (str): Name of the selected image
+            index (int): Index of the selected image
+        """                
         self.cur_image_id = index
         self._reset_camera_view = True
         self.scene_load(self.cur_scene_id, self.cur_image_id)
@@ -704,7 +715,12 @@ class AppWindow:
         rgb = (color.red, color.green, color.blue)
         self._GT_color = rgb
 
-    def _on_show_ground_truth(self, show):
+    def _on_show_ground_truth(self, show:bool) -> None:
+        """Callback for the ground truth checkbox, shows or hides the ground truth 3D models
+
+        Args:
+            show (bool): True to show the ground truth, False to hide
+        """        
         if show:
             mtl = o3d.visualization.rendering.MaterialRecord()
             mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
@@ -718,7 +734,7 @@ class AppWindow:
                 self._scene.scene.remove_geometry(gt_name)
             
 
-    def _on_show_predictions(self, show):
+    def _on_show_predictions(self, show:bool) ->None:
         """Serves as a callback for the prediction checkboxes, Removes and shows the predictions based on the checkbox state"""
         mtl = o3d.visualization.rendering.MaterialRecord()
         mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
@@ -739,9 +755,11 @@ class AppWindow:
                     self._scene.scene.remove_geometry(pred_name)
 
     def _update_scene(self):
+        """Updates the scene based on the current scene and image index"""
         self.scene_load(self.cur_scene_id, self.cur_image_id)
 
     def _on_layout(self, layout_context):
+        """Callback for the layout event, updates the layout of the main window"""
         r = self.main_window.content_rect
         self._scene.frame = r
         width = 17 * layout_context.theme.font_size
@@ -754,32 +772,19 @@ class AppWindow:
         self._settings_panel.frame = gui.Rect(r.get_right() - width, r.y, width, height)
 
     def _on_point_size(self, size):
+        """Callback for the point size slider, updates the point size in the scene"""
         self.settings.scene_material.point_size = int(size)
         self.settings.apply_material = True
         self._apply_settings()
 
-    def _on_highlight_obj(self, light):
-        self.settings.highlight_obj = light
-        if light:
-            self.settings.annotation_obj_material.base_color = [0.9, 0.3, 0.3, 1.0]
-        elif not light:
-            self.settings.annotation_obj_material.base_color = [0.9, 0.9, 0.9, 1.0]
-
-        self._apply_settings()
-
-        # update current object visualization
-        meshes = self._annotation_scene.get_objects()
-        for mesh in meshes:
-            self._scene.scene.modify_geometry_material(
-                mesh.obj_name, self.settings.annotation_obj_material
-            )
-
     def _on_show_axes(self, show):
+        """Callback for the show axes checkbox, shows or hides the axes in the scene"""
         self.settings.show_axes = show
         self._apply_settings()
         pass
 
     def _on_save_images(self):
+        """Callback for the save images button, saves the images to the specified directory""" 
         LOGGER.info(f"Saving images for {self.scene.dataset_name} scene: {self._bop_scene_id} image: {self._bop_img_id}")
         image_name = f"{self.scene.dataset_name}_3Dvis_s{str(self._bop_scene_id).zfill(6)}_i{str(self._bop_img_id).zfill(6)}_v{str(self.viewpoits_captured).zfill(2)}"
         scene_img_path = self.save_image_path / f"{image_name}.png"
@@ -802,7 +807,17 @@ class AppWindow:
             cv2.imwrite(str(inference_img_path), self.rgb)
 
 
-    def _make_point_cloud(self, rgb_img, depth_img, cam_K):
+    def _make_point_cloud(self, rgb_img:np.ndarray, depth_img:np.ndarray, cam_K:np.ndarray) -> o3d.geometry.PointCloud:
+        """Converts the RGB and depth images to a point cloud
+
+        Args:
+            rgb_img (np.ndarray): Colored image [HxWx3]
+            depth_img (np.ndarray): Depth image [HxW]
+            cam_K (np.ndarray): Camera intrinsics [3x3]
+
+        Returns:
+            o3d.geometry.PointCloud: Colored point cloud of the scene
+        """         
         # convert images to open3d types
         rgb_img_o3d = o3d.geometry.Image(cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB))
         depth_img_o3d = o3d.geometry.Image(depth_img)
@@ -911,14 +926,14 @@ class AppWindow:
                     LOGGER.warning(e)
                     continue
 
-    def _on_show_camera_pyramid(self, show):
+    def _on_show_camera_pyramid(self, show:bool):
         """ Callback for the camera pyramid checkbox
 
         If the checkbox is checked the camera pyramid is shown in the scene
         If it is unchecked the camera pyramid is removed from the scene as well as the image plane if it is shown
 
         Args:
-            show (_type_): _description_
+            show (bool): Callback value of the checkbox
         """        
         if show:
             self.create_camera_pyramid(self.rgb, self.Kmx)
@@ -930,14 +945,14 @@ class AppWindow:
                 self._scene.scene.remove_geometry("image_plane")
                 self._show_camera_image.checked = False
 
-    def _on_show_camera_image(self, show):
+    def _on_show_camera_image(self, show:bool):
         """Callback for the camera image checkbox
 
         If the checkbox is checked the camera image is shown in the scene
 
 
         Args:
-            show (_type_): _description_
+            show (bool): Callback value of the checkbox
         """   
 
         if show and self._show_camera_pyramid.checked:
@@ -956,10 +971,9 @@ class AppWindow:
         depicting the top of the image
         
         Args:
-            rgb (_type_): _description_
-            cam_K (_type_): _description_
+            rgb (np.ndarray): RGB image [HxWx3] 
+            cam_K (np.ndarray): Camera intrinsics [3x3] matrix
         """        
-        # TODO: add this shit to all the necessery stuff
         mtl = o3d.visualization.rendering.MaterialRecord()
         mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
         mtl.shader = "defaultLit"
@@ -968,8 +982,6 @@ class AppWindow:
         camera_lineset = camera_lineset.create_camera_visualization(w,h,cam_K, np.eye(4), scale=0.1)
         camera_lineset.paint_uniform_color([.2, .2, .2])
         camera_points = np.asarray(camera_lineset.points)
-        # print(camera_points)
-        # print(camera_points.shape)
         self._scene.scene.add_geometry("camera", camera_lineset, mtl)
 
         # create top view of the pyramid
@@ -983,11 +995,8 @@ class AppWindow:
         h = height * 0.33
         
         mid_width = (right_top[0] - left_top[0])/2
-        # print(mid_width)
-        # print(h)
 
         notch_point = np.array([left_top[0] + mid_width, left_top[1] - h, left_top[2]])
-        # print(notch_point)
         notch_points = np.array([left_top, right_top, notch_point])
         top_lineset = o3d.geometry.LineSet()
         top_lineset.points = o3d.utility.Vector3dVector(notch_points)
@@ -995,21 +1004,22 @@ class AppWindow:
         top_lineset.paint_uniform_color([.2, .2, .2])
         self._scene.scene.add_geometry("camera_top", top_lineset, mtl)
 
-        # TODO: Figure out if it is possible to add the current image inside the camera pyramid
         
 
-    def create_image_plane(self, rgb:np.ndarray, left_top:np.ndarray, right_top:np.ndarray, right_bot:np.ndarray, left_bot:np.ndarray):
+    def create_image_plane(self, img:np.ndarray, left_top:np.ndarray, right_top:np.ndarray, right_bot:np.ndarray, left_bot:np.ndarray) -> None:
+        """Creates the image plane with the texture of the image and adds it to the scene
+
+        Args:
+            img (np.ndarray): RGB image [HxWx3]
+            left_top (np.ndarray): Top left corner of the image plane [x,y,z]
+            right_top (np.ndarray): Top right corner of the image plane [x,y,z]
+            right_bot (np.ndarray): Bottom right corner of the image plane [x,y,z]
+            left_bot (np.ndarray): Bottom left corner of the image plane [x,y,z]
+        """        
         
-        img = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
-        # img = cv2.rotate(img, cv2.ROTATE_180)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = cv2.flip(img, 0)
         map_image = o3d.geometry.Image(img)
-
-        o3d.io.write_image("map_image.png", map_image)
-        # map_resy =  rgb.shape[0]
-        # map_resx =  rgb.shape[1]
-        # dtype_f = o3d.core.float32
-        # dtype_i = o3d.core.int64
         
         # Create a rectangle mesh with the image as texture
         vertices = np.array([left_top, right_top, right_bot, left_bot], dtype=np.float32)
@@ -1019,7 +1029,6 @@ class AppWindow:
 
         # Create a material for the textured mesh
         material = o3d.visualization.rendering.MaterialRecord()
-        # material.shader = "defaultLit"
         material.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
         material.base_metallic = 0.0
         material.base_roughness = 1.0
@@ -1029,8 +1038,7 @@ class AppWindow:
         texture_map.vertices = o3d.utility.Vector3dVector(vertices)
         texture_map.triangles = o3d.utility.Vector3iVector(triangles)
         texture_map.triangle_uvs = o3d.utility.Vector2dVector(uvs)
-        texture_map.textures = [map_image]
-        # texture_map.compute_vertex_normals()
+        # texture_map.textures = [map_image]
 
         self._scene.scene.add_geometry("image_plane", texture_map, material)
 
@@ -1187,7 +1195,7 @@ class AppWindow:
 
         self._scene.scene.set_lighting(rendering.Open3DScene.LightingProfile.NO_SHADOWS, [0, 0, 1])
 
-def run_app(config: dict, connection: socket.socket):
+def run_app(config: dict, connection: socket.socket) -> None:
     """Runs the application with the given connection for 2D visualization
 
     Args:
@@ -1215,6 +1223,11 @@ def run_app(config: dict, connection: socket.socket):
 
 
 def parse_arguments() -> argparse.Namespace:
+    """Parses the arguments for the prediction visualizer
+
+    Returns:
+        argparse.Namespace: Parsed arguments
+    """    
     parser = argparse.ArgumentParser(description="Run the prediction visualizer scripts.")
     parser.add_argument(
         "--config",
@@ -1232,11 +1245,8 @@ if __name__ == "__main__":
     with open(config_path, "r") as f:
         config = json.load(f)
 
-    
-
     host = LOCAL_HOST_IP
     port = 65432
-
     host = config.get("host", host)
     port = config.get("port", port)
 
