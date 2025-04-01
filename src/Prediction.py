@@ -79,6 +79,8 @@ class Prediction:
         self.overlay = None
         self.contour = None
 
+        self.contour_thickness:int = 2
+
         self.contour_img = None
         self.overlay_img = None
 
@@ -158,6 +160,14 @@ class Prediction:
 
         return predictions
 
+    def set_contour_thickness(self, thickness: int) -> None:
+        """Sets the thickness of the contour lines
+        Args:
+            thickness (int): Thickness of the contour lines
+        """
+        self.contour_thickness = thickness
+        if self.contour_img is not None:
+            self.draw_curr_window2D()
 
     def draw_curr_window2D(self):
         """Draws the current overlay and contour images in the 2D window, also should be fasetr for the change of color"""
@@ -173,7 +183,8 @@ class Prediction:
         overlay = cv2.addWeighted(overlay_img, 1, masked_img, 1, 0)
         
         contour_img = img.copy()
-        cv2.drawContours(contour_img, self.contours, -1, color, 2)
+        # TODO: ADD A SLIDER FOR THE CONTOUR THICKNESS
+        cv2.drawContours(contour_img, self.contours, -1, color, self.contour_thickness) 
         together = np.concatenate((overlay, contour_img), axis=0) 
         if self._is_window2D_initialized:
             self._update_window2D(together)

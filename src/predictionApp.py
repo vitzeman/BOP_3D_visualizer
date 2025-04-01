@@ -274,6 +274,7 @@ class AppWindow:
         self._point_size.set_limits(1, 5)
         self._point_size.set_on_value_changed(self._on_point_size)
 
+
         grid = gui.VGrid(2, 0.25 * em)
         grid.add_child(gui.Label("Point size"))
         grid.add_child(self._point_size)
@@ -389,6 +390,22 @@ class AppWindow:
             h.add_child(prediction._color_picker)
             visualization_control.add_child(h)
         # <<< Prediction visualization cotrol<<<
+
+        # >>> Contour thickness >>>
+        # self._point_size = gui.Slider(gui.Slider.INT)
+        # self._point_size.set_limits(1, 5)
+        # self._point_size.set_on_value_changed(self._on_point_size)
+        self._contour_thickness = gui.Slider(gui.Slider.INT)
+        self._contour_thickness.int_value = 2
+        self._contour_thickness.set_limits(1, 10)
+        self._contour_thickness.set_on_value_changed(self._on_contour_thickness)
+
+        grid = gui.VGrid(2, 0.25 * em)
+        grid.add_child(gui.Label("Contour thickness"))
+        grid.add_child(self._contour_thickness)
+
+        visualization_control.add_child(grid)
+        # <<< Contour thickness <<<
 
         # >>> save images >>>
         self.save_image_path = Path(save_image_path)
@@ -788,6 +805,12 @@ class AppWindow:
             ).height,
         )
         self._settings_panel.frame = gui.Rect(r.get_right() - width, r.y, width, height)
+
+    def _on_contour_thickness(self, thickness:int):
+        """Callback for the contour thickness slider, updates the contour thickness in the scene"""
+        thickness = int(thickness)
+        for prediction in self.predictions:
+            prediction.set_contour_thickness(thickness)
 
     def _on_point_size(self, size):
         """Callback for the point size slider, updates the point size in the scene"""
