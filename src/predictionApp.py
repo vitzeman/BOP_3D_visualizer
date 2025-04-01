@@ -34,7 +34,7 @@ os.makedirs("logs", exist_ok=True)
 logging.basicConfig(
     level=logging.DEBUG,
     format="%(asctime)s | %(levelname)s | %(name)s | l: %(lineno)s | %(message)s",
-    handlers=[logging.FileHandler("logs/log.log", mode="w"), logging.StreamHandler()],
+    handlers=[logging.FileHandler("logs/log.log", mode="a"), logging.StreamHandler()],
 )
 LOGGER = logging.getLogger("3DPrediction")
 
@@ -254,7 +254,7 @@ class AppWindow:
 
         self._show_camera_pyramid = gui.Checkbox("Show camera pyramid")
         self._show_camera_pyramid.set_on_checked(self._on_show_camera_pyramid)
-        self._show_camera_pyramid.checked = True
+        self._show_camera_pyramid.checked = False
         view_ctrls.add_child(self._show_camera_pyramid)
 
         self._show_camera_image = gui.Checkbox("Show camera image")
@@ -465,10 +465,23 @@ class AppWindow:
         pass
 
     def _on_show_pointcloud(self, show):
-        print("TODO Implement the point cloud visualization")
+        if show and self.pcd is not None:
+            mtl = o3d.visualization.rendering.MaterialRecord()
+            mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
+            mtl.shader = "defaultUnlit"
+            self._scene.scene.add_geometry(
+                "point_cloud",
+                self.pcd,
+                mtl,
+                # self.settings.scene_material,
+                add_downsampled_copy_for_fast_rendering=True,
+            )
+        elif self.pcd is not None:
+            self._scene.scene.remove_geometry("point_cloud")
 
-        self._update_scene()
-        pass
+        else:
+            self._show_pointcloud.checked = False
+            LOGGER.warning("No point cloud found in the scene")
 
     def _init_scene_combox(self):
         """Initializes the scene combobox with the scene names"""
@@ -721,7 +734,7 @@ class AppWindow:
         Args:
             show (bool): True to show the ground truth, False to hide
         """        
-        if show:
+        if show and len(self._current_gt_names) > 0:
             mtl = o3d.visualization.rendering.MaterialRecord()
             mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
             mtl.shader = "defaultLit"
@@ -729,12 +742,17 @@ class AppWindow:
                 self._scene.scene.remove_geometry(gt_name)
                 gt_model.paint_uniform_color(self._GT_color)
                 self._scene.scene.add_geometry(gt_name, gt_model, mtl)
-        else:
+        elif len(self._current_gt_names) > 0:
+            # Remove the ground truth models from the scene
             for gt_name in self._current_gt_names:
                 self._scene.scene.remove_geometry(gt_name)
-            
+            self._show_ground_truth.checked = False
+        else:
+            # No ground truth models to show
+            self._show_ground_truth.checked = False
+            LOGGER.warning("No ground truth found in the scene")
 
-    def _on_show_predictions(self, show:bool) ->None:
+    def _on_show_predictions(self, show:bool) -> None:
         """Serves as a callback for the prediction checkboxes, Removes and shows the predictions based on the checkbox state"""
         mtl = o3d.visualization.rendering.MaterialRecord()
         mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
@@ -1132,34 +1150,20 @@ class AppWindow:
             depth = depth.astype(np.float32) * depth_scale / 1000
         else:
             depth = None
-            pcd = None
+            self.pcd = None
             LOGGER.warning(
                 f"Depth image not found for {depth_path} - No point cloud will be shown"
             )
             self._show_pointcloud.checked = False
 
-        if depth is not None and self._show_pointcloud.checked:
-            pcd = self._make_point_cloud(rgb, depth, cam_K)
-            mtl = o3d.visualization.rendering.MaterialRecord()
-            mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
-            mtl.shader = "defaultUnlit"
-            self._scene.scene.add_geometry(
-                "point_cloud",
-                pcd,
-                mtl,
-                # self.settings.scene_material,
-                add_downsampled_copy_for_fast_rendering=True,
-            )
+        bounds = None
+        # if depth is not None and self._show_pointcloud.checked:
+        if depth is not None:
+            self.pcd = self._make_point_cloud(rgb, depth, cam_K)
+            self._on_show_pointcloud(self._show_pointcloud.checked)
 
-            bounds = pcd.get_axis_aligned_bounding_box()
+            bounds = self.pcd.get_axis_aligned_bounding_box()
 
-            if self._reset_camera_view:
-                self._scene.setup_camera(60, bounds, bounds.get_center())
-                center = np.array([0, 0, 0])
-                eye = center + np.array([0, 0, -0.5])
-                up = np.array([0, -1, 0])
-                self._scene.look_at(center, eye, up)
-                self._reset_camera_view = False
         
         # <<< DEPTH IMAGE  + PCD <<<
 
@@ -1173,6 +1177,10 @@ class AppWindow:
                     f"Ground truth file not found in {gt_path} - Skipping the GT visualization"
                 )
                 gt = []
+                self._show_ground_truth.checked = False
+                self._current_gt_names = []
+                self._current_gt_models = []
+
             else:
                 with open(gt_path) as f:
                     gt = json.load(f)
@@ -1192,6 +1200,16 @@ class AppWindow:
         self._bop_img_id = bop_img_id
         self._add_predictions_to_scene(bop_scene_id, bop_img_id)
         # <<< VISUALIZATION OF THE PREDICTIONS <<<
+
+        if bounds is None:
+            bounds = self._scene.scene.bounding_box
+        if self._reset_camera_view:
+            self._scene.setup_camera(60, bounds, bounds.get_center())
+            center = np.array([0, 0, 0])
+            eye = center + np.array([0, 0, -0.5])
+            up = np.array([0, -1, 0])
+            self._scene.look_at(center, eye, up)
+            self._reset_camera_view = False
 
         self._scene.scene.set_lighting(rendering.Open3DScene.LightingProfile.NO_SHADOWS, [0, 0, 1])
 

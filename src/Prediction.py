@@ -57,6 +57,7 @@ class Prediction:
         csv_path = Path(csv_path)
         assert csv_path.exists(), f"Path {csv_path} does not exist"
 
+        LOGGER.info(f"Loading the csv file: {csv_path}")
         df = pd.read_csv(csv_path)
         self.dataframe: pd.DataFrame = df
 
