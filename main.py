@@ -68,6 +68,7 @@ def check_config(config_path:Path) -> None:
 if __name__ == "__main__":
     args = parse_arguments()
     config_path = Path(args.config)
+    # TODO: ADD TO CONFIG HOST AND PORT POSSIBIILITIES
     check_config(config_path)
 
 

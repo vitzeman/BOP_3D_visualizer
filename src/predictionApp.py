@@ -220,7 +220,6 @@ class AppWindow:
         self.main_window = gui.Application.instance.create_window(
             "Prediction Visualizer", *resolution,0,0
         )
-        print(type(self.main_window))
         mw = self.main_window
         mw.set_on_close(self._on_close_mw)
 
@@ -401,7 +400,9 @@ class AppWindow:
         self._contour_thickness.set_on_value_changed(self._on_contour_thickness)
 
         grid = gui.VGrid(2, 0.25 * em)
-        grid.add_child(gui.Label("Contour thickness"))
+        text = gui.Label("Contour thickness")
+        # text.preferred_width = 0.3 * em
+        grid.add_child(text)
         grid.add_child(self._contour_thickness)
 
         visualization_control.add_child(grid)
