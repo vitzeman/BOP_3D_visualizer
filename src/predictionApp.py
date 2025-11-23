@@ -353,13 +353,7 @@ class AppWindow:
         )
         visualization_control.set_is_open(True)
 
-        self._reload_button = gui.Button("Update colors")
-        self._reload_button.horizontal_padding_em = 0.8
-        self._reload_button.vertical_padding_em = 0
-        self._reload_button.set_on_clicked(self._on_reload_colors)
-        visualization_control.add_child(self._reload_button)
-
-        self._show_ground_truth = gui.Checkbox("Ground truth")
+        self._show_ground_truth = gui.Checkbox("Ground Truth")
         self._show_ground_truth.checked = True 
         self._show_ground_truth.set_on_checked(self._on_show_ground_truth)
 
@@ -368,11 +362,11 @@ class AppWindow:
         self._GT_color_picker = gui.ColorEdit()
         self._GT_color_picker.color_value = gui.Color(*self._GT_color)
         self._GT_color_picker.set_on_value_changed(self._gt_color_changed)
-        h = gui.Horiz(1 * em)
+        h = gui.VGrid(2, 0.1 * em)
         h.add_child(self._show_ground_truth)
         h.add_child(self._GT_color_picker)
 
-        visualization_control.add_child(h)
+        # visualization_control.add_child(h)
         # >>> Prediction visualization control>>>
         for prediction in self.predictions:
             prediction._checkbox = gui.Checkbox(prediction.method_name)
@@ -384,11 +378,18 @@ class AppWindow:
             prediction._color_picker.color_value = gui.Color(*prediction.color)
             prediction._color_picker.set_on_value_changed(prediction._update_color)
 
-            h = gui.Horiz(1 * em)
+            # h = gui.VGrid(2, 1 * em)
             h.add_child(prediction._checkbox)
             h.add_child(prediction._color_picker)
-            visualization_control.add_child(h)
+            # visualization_control.add_child(h)
         # <<< Prediction visualization cotrol<<<
+        visualization_control.add_child(h)
+
+        self._reload_button = gui.Button("Update colors")
+        self._reload_button.horizontal_padding_em = 0.8
+        self._reload_button.vertical_padding_em = 0
+        self._reload_button.set_on_clicked(self._on_reload_colors)
+        visualization_control.add_child(self._reload_button)
 
         # >>> Contour thickness >>>
         # self._point_size = gui.Slider(gui.Slider.INT)
@@ -979,6 +980,7 @@ class AppWindow:
         """        
         if show:
             self.create_camera_pyramid(self.rgb, self.Kmx)
+            self._show_camera_image.enabled = True
         else:
             self._scene.scene.remove_geometry("camera")
             self._scene.scene.remove_geometry("camera_top")
@@ -986,6 +988,8 @@ class AppWindow:
             if self._show_camera_image.checked:
                 self._scene.scene.remove_geometry("image_plane")
                 self._show_camera_image.checked = False
+
+            self._show_camera_image.enabled = False
 
     def _on_show_camera_image(self, show:bool):
         """Callback for the camera image checkbox
@@ -1018,7 +1022,9 @@ class AppWindow:
         """        
         mtl = o3d.visualization.rendering.MaterialRecord()
         mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
-        mtl.shader = "defaultLit"
+        mtl.shader = "unlitLine"
+        mtl.line_width = 5.0  
+
         h, w = rgb.shape[:2]
         camera_lineset = o3d.geometry.LineSet()
         camera_lineset = camera_lineset.create_camera_visualization(w,h,cam_K, np.eye(4), scale=0.1)
@@ -1165,6 +1171,7 @@ class AppWindow:
 
         # self.create_camera_pyramid(cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB), cam_K)
         self._on_show_camera_pyramid(self._show_camera_pyramid.checked)
+        self._on_show_camera_image(self._show_camera_image.checked)
 
         # >>> DEPTH IMAGE  + PCD >>>
         depth_path = scene_path / self._depth_dir_name / rgbs_names[image_idx]
