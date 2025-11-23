@@ -61,3 +61,4 @@ Will call 2 subprocesses for the GUI/3D visualization and the 2D visualization s
 - [X] Add the camera pose visualization.
 - [ ] Make more robust for xyzibd where multiple cameras are present in the scene.
 - [X] Finish the documentation and type hints.
+- [ ] Add transparency to the 3D meshes.

@@ -174,3 +174,4 @@ cython_debug/
 config/*
 !config/example_config.json
 images_iccv25/*
+data/*
