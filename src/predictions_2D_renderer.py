@@ -128,6 +128,9 @@ class PredictionVisualizerTwoD:
             while True:
                 b = self.s.recv(1024).decode()
                 bytes += b
+                if b == "":
+                    LOGGER.info("Connection closed by the client.")
+                    return
                 last = b[-1]
                 if last == "\n":
                     break

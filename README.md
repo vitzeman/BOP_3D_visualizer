@@ -62,3 +62,10 @@ Will call 2 subprocesses for the GUI/3D visualization and the 2D visualization s
 - [ ] Make more robust for xyzibd where multiple cameras are present in the scene.
 - [X] Finish the documentation and type hints.
 - [ ] Add transparency to the 3D meshes.
+
+# Known issues 
+For Wayland in linux the Open3D visualization window might not open. use X11 session instead by running 
+```bash
+export XDG_SESSION_TYPE=x11
+```
+before starting the application.
