@@ -43,10 +43,10 @@ LOGGER = logging.getLogger("3DPrediction")
 COLORS_RGB_U8 = [
     # (230, 25, 75), # RED 
     # (60, 180, 75), # GREEN # Excludint due to to usage as the GT
+    (145, 30, 180),  # PURPLE
     (255, 225, 25),  # YELLOW
     (0, 130, 200),  # BLUE
     (245, 130, 48),  # ORANGE
-    (145, 30, 180),  # PURPLE
     (70, 240, 240),  # CYAN
     (240, 50, 230),  # MAGENTA
     (210, 245, 60),  # LIME
@@ -1023,12 +1023,11 @@ class AppWindow:
         mtl = o3d.visualization.rendering.MaterialRecord()
         mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
         mtl.shader = "unlitLine"
-        mtl.line_width = 5.0  
+        mtl.line_width = 3.0
 
         h, w = rgb.shape[:2]
         camera_lineset = o3d.geometry.LineSet()
         camera_lineset = camera_lineset.create_camera_visualization(w,h,cam_K, np.eye(4), scale=0.1)
-        camera_lineset.paint_uniform_color([.2, .2, .2])
         camera_points = np.asarray(camera_lineset.points)
         self._scene.scene.add_geometry("camera", camera_lineset, mtl)
 
@@ -1049,7 +1048,7 @@ class AppWindow:
         top_lineset = o3d.geometry.LineSet()
         top_lineset.points = o3d.utility.Vector3dVector(notch_points)
         top_lineset.lines = o3d.utility.Vector2iVector([[0, 2], [2,1]])
-        top_lineset.paint_uniform_color([.2, .2, .2])
+        top_lineset.paint_uniform_color([0, 0, 1])  # Blue color for the notch
         self._scene.scene.add_geometry("camera_top", top_lineset, mtl)
 
         
