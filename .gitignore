@@ -175,3 +175,4 @@ config/*
 !config/example_config.json
 images_iccv25/*
 data/*
+CLAUDE.md

@@ -279,6 +279,17 @@ class AppWindow:
         grid.add_child(self._point_size)
         view_ctrls.add_child(grid)
 
+        self._pcd_opacity_slider = gui.Slider(gui.Slider.DOUBLE)
+        self._pcd_opacity_slider.double_value = 1.0
+        self._pcd_opacity_slider.set_limits(0.0, 1.0)
+        self._pcd_opacity_slider.set_on_value_changed(self._on_pcd_opacity)
+        self._pcd_opacity_slider.enabled = False  # disabled until depth data is available
+
+        grid_pcd = gui.VGrid(2, 0.25 * em)
+        grid_pcd.add_child(gui.Label("PCD opacity"))
+        grid_pcd.add_child(self._pcd_opacity_slider)
+        view_ctrls.add_child(grid_pcd)
+
         self._settings_panel.add_child(view_ctrls)
         # <<< View control <<<
 
@@ -409,6 +420,18 @@ class AppWindow:
         visualization_control.add_child(grid)
         # <<< Contour thickness <<<
 
+        # >>> Mesh opacity >>>
+        self._mesh_opacity_slider = gui.Slider(gui.Slider.DOUBLE)
+        self._mesh_opacity_slider.double_value = 1.0
+        self._mesh_opacity_slider.set_limits(0.0, 1.0)
+        self._mesh_opacity_slider.set_on_value_changed(self._on_mesh_opacity)
+
+        grid_opacity = gui.VGrid(2, 0.25 * em)
+        grid_opacity.add_child(gui.Label("Mesh opacity"))
+        grid_opacity.add_child(self._mesh_opacity_slider)
+        visualization_control.add_child(grid_opacity)
+        # <<< Mesh opacity <<<
+
         # >>> save images >>>
         self.save_image_path = Path(save_image_path)
         self.save_image_path.mkdir(parents=True, exist_ok=True)
@@ -443,15 +466,52 @@ class AppWindow:
         mw.set_on_menu_item_activated(AppWindow.MENU_ABOUT, self._on_menu_about)
         # <<< Menu <<<
 
+        self._pcd_opacity: float = 1.0  # must be set before _on_point_size → _apply_settings
         self._on_point_size(1)  # set default size to 1
 
         self._apply_settings()
+
+        self._mesh_opacity: float = 1.0
 
         self._annotation_scene = None
 
         self._left_shift_modifier = False
 
         self._img_window_initialized = False
+
+    def _make_mesh_material(self) -> rendering.MaterialRecord:
+        """Returns a MaterialRecord for mesh geometry using the current opacity."""
+        mtl = rendering.MaterialRecord()
+        alpha = self._mesh_opacity
+        mtl.base_color = [1.0, 1.0, 1.0, alpha]
+        mtl.shader = "defaultLitTransparency" if alpha < 1.0 else "defaultLit"
+        return mtl
+
+    def _on_mesh_opacity(self, opacity: float) -> None:
+        """Callback for the mesh opacity slider; re-renders all meshes with new alpha."""
+        self._mesh_opacity = opacity
+        self._on_reload_colors()
+
+    def _make_pcd_material(self) -> rendering.MaterialRecord:
+        """Returns a MaterialRecord for the point cloud using the current pcd opacity and point size."""
+        mtl = rendering.MaterialRecord()
+        alpha = self._pcd_opacity
+        mtl.base_color = [1.0, 1.0, 1.0, alpha]
+        mtl.shader = "defaultLitTransparency" if alpha < 1.0 else "defaultUnlit"
+        mtl.point_size = self.settings.scene_material.point_size
+        return mtl
+
+    def _on_pcd_opacity(self, opacity: float) -> None:
+        """Callback for the PCD opacity slider; re-renders the point cloud with new alpha."""
+        self._pcd_opacity = opacity
+        if self.pcd is not None and self._show_pointcloud.checked:
+            self._scene.scene.remove_geometry("point_cloud")
+            self._scene.scene.add_geometry(
+                "point_cloud",
+                self.pcd,
+                self._make_pcd_material(),
+                add_downsampled_copy_for_fast_rendering=True,
+            )
 
     def _on_reset_camera_view(self):
         """Resets the camera view"""
@@ -485,21 +545,19 @@ class AppWindow:
 
     def _on_show_pointcloud(self, show):
         if show and self.pcd is not None:
-            mtl = o3d.visualization.rendering.MaterialRecord()
-            mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
-            mtl.shader = "defaultUnlit"
             self._scene.scene.add_geometry(
                 "point_cloud",
                 self.pcd,
-                mtl,
-                # self.settings.scene_material,
+                self._make_pcd_material(),
                 add_downsampled_copy_for_fast_rendering=True,
             )
+            self._pcd_opacity_slider.enabled = True
         elif self.pcd is not None:
             self._scene.scene.remove_geometry("point_cloud")
-
+            self._pcd_opacity_slider.enabled = True
         else:
             self._show_pointcloud.checked = False
+            self._pcd_opacity_slider.enabled = False
             LOGGER.warning("No point cloud found in the scene")
 
     def _init_scene_combox(self):
@@ -552,7 +610,7 @@ class AppWindow:
 
         if self.settings.apply_material:
             self._scene.scene.modify_geometry_material(
-                "point_cloud", self.settings.scene_material
+                "point_cloud", self._make_pcd_material()
             )
             self.settings.apply_material = False
 
@@ -713,12 +771,10 @@ class AppWindow:
         self._reset_camera_view = True
         self.scene_load(self.cur_scene_id, self.cur_image_id)
 
-    def _on_reload_colors(self): 
+    def _on_reload_colors(self):
         """Reloads the visualization colors"""
 
-        mtl = o3d.visualization.rendering.MaterialRecord()
-        mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
-        mtl.shader = "defaultLit"
+        mtl = self._make_mesh_material()
 
         for prediction in self.predictions:
             if prediction._checkbox.checked: # Draw only if the checkbox is checked
@@ -754,9 +810,7 @@ class AppWindow:
             show (bool): True to show the ground truth, False to hide
         """        
         if show and len(self._current_gt_names) > 0:
-            mtl = o3d.visualization.rendering.MaterialRecord()
-            mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
-            mtl.shader = "defaultLit"
+            mtl = self._make_mesh_material()
             for gt_name, gt_model in zip(self._current_gt_names, self._current_gt_models):
                 self._scene.scene.remove_geometry(gt_name)
                 gt_model.paint_uniform_color(self._GT_color)
@@ -773,9 +827,7 @@ class AppWindow:
 
     def _on_show_predictions(self, show:bool) -> None:
         """Serves as a callback for the prediction checkboxes, Removes and shows the predictions based on the checkbox state"""
-        mtl = o3d.visualization.rendering.MaterialRecord()
-        mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
-        mtl.shader = "defaultLit"
+        mtl = self._make_mesh_material()
         for prediction in self.predictions:
             if prediction._checkbox.checked:
                 for pred_name, pred_model in zip(prediction._current_pred_names, prediction._current_pred_models):
@@ -888,9 +940,7 @@ class AppWindow:
             gt (list): List with the ground truth annotations of the BOP format
         """
 
-        mtl = o3d.visualization.rendering.MaterialRecord()
-        mtl.base_color = [1.0, 1.0, 1.0, 1.0]  # RGBA
-        mtl.shader = "defaultLit"
+        mtl = self._make_mesh_material()
         self._current_gt_count = {}
         self._current_gt_names = []
         self._current_gt_models = []
@@ -950,16 +1000,17 @@ class AppWindow:
 
             prediction._current_pred_models = prediction_objs
             prediction._current_pred_names = []
+            pred_mtl = self._make_mesh_material()
 
             for e, obj in enumerate(prediction_objs):
                 model_name = f"{prediction.method_name}_{e}"
                 prediction._current_pred_names.append(model_name)
                 LOGGER.debug(f"Adding {model_name} to the scene")
-                # TODO: Figure out why sometimes the model is not able to be givent to the scene
+                # TODO: Figure out why sometimes the model is not able to be given to the scene
                 try:
                     if prediction._checkbox.checked:
                         self._scene.scene.add_geometry(
-                            model_name, obj, prediction._material
+                            model_name, obj, pred_mtl
                         )
 
                 except Exception as e:
@@ -1193,8 +1244,9 @@ class AppWindow:
             self._on_show_pointcloud(self._show_pointcloud.checked)
 
             bounds = self.pcd.get_axis_aligned_bounding_box()
+        else:
+            self._pcd_opacity_slider.enabled = False
 
-        
         # <<< DEPTH IMAGE  + PCD <<<
 
         # >>> VISUALIZATION OF THE GT >>>
